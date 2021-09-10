@@ -1,1 +1,1 @@
-# settingstore
+# Setting Store
