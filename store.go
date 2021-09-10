@@ -30,26 +30,7 @@ func WithAutoMigrate(automigrateEnabled bool) StoreOption {
 	}
 }
 
-// WithDriverAndDNS sets the driver and the DNS for the database for the cache store
-// func WithDriverAndDNS(driverName string, dsn string) StoreOption {
-// 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-
-// 	if err != nil {
-// 		panic("failed to connect database")
-// 	}
-
-// 	return func(s *Store) {
-// 		s.db = db
-// 	}
-// }
-
-// WithGormDb sets the GORM database for the cache store
-// func WithGormDb(db *gorm.DB) StoreOption {
-// 	return func(s *Store) {
-// 		s.db = db
-// 	}
-// }
-
+// WithDb sets the database for the setting store
 func WithDb(db *sql.DB) StoreOption {
 	return func(s *Store) {
 		s.db = db
@@ -64,7 +45,7 @@ func WithTableName(settingsTableName string) StoreOption {
 	}
 }
 
-// NewStore creates a new entity store
+// NewStore creates a new setting store
 func NewStore(opts ...StoreOption) *Store {
 	store := &Store{}
 	for _, opt := range opts {
@@ -72,7 +53,7 @@ func NewStore(opts ...StoreOption) *Store {
 	}
 
 	if store.settingsTableName == "" {
-		log.Panic("Vault store: vaultTableName is required")
+		log.Panic("Setting store: settingTableName is required")
 	}
 
 	if store.automigrateEnabled {
@@ -80,55 +61,6 @@ func NewStore(opts ...StoreOption) *Store {
 	}
 
 	return store
-}
-
-func (st *Store) SqlCreateTable() string {
-	sqlMysql := `
-	CREATE TABLE IF NOT EXISTS ` + st.settingsTableName + ` (
-	  id varchar(40) NOT NULL PRIMARY KEY,
-	  setting_key varchar(40) NOT NULL,
-	  setting_value text,
-	  created_at datetime NOT NULL,
-	  updated_at datetime NOT NULL,
-	  deleted_at datetime
-	);
-	`
-
-	sqlPostgres := `
-	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
-	  "id" varchar(40) NOT NULL PRIMARY KEY,
-	  "setting_key" varchar(40) NOT NULL,
-	  "setting_value" text,
-	  "created_at" timestamptz(6) NOT NULL,
-	  "updated_at" timestamptz(6) NOT NULL,
-	  "deleted_at" timestamptz(6)
-	)
-	`
-
-	sqlSqlite := `
-	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
-	  "id" varchar(40) NOT NULL PRIMARY KEY,
-	  "setting_key" varchar(40) NOT NULL,
-	  "setting_value" text,
-	  "created_at" timestamptz(6) NOT NULL,
-	  "updated_at" timestamptz(6) NOT NULL,
-	  "deleted_at" timestamptz(6)
-	)
-	`
-
-	sql := "unsupported driver " + st.dbDriverName
-
-	if st.dbDriverName == "mysql" {
-		sql = sqlMysql
-	}
-	if st.dbDriverName == "postgres" {
-		sql = sqlPostgres
-	}
-	if st.dbDriverName == "sqlite" {
-		sql = sqlSqlite
-	}
-
-	return sql
 }
 
 // AutoMigrate auto migrate
@@ -143,6 +75,25 @@ func (st *Store) AutoMigrate() error {
 	}
 
 	return nil
+}
+
+// DriverName finds the driver name from database
+func (st *Store) DriverName(db *sql.DB) string {
+	dv := reflect.ValueOf(db.Driver())
+	driverFullName := dv.Type().String()
+	if strings.Contains(driverFullName, "mysql") {
+		return "mysql"
+	}
+	if strings.Contains(driverFullName, "postgres") || strings.Contains(driverFullName, "pq") {
+		return "postgres"
+	}
+	if strings.Contains(driverFullName, "sqlite") {
+		return "sqlite"
+	}
+	if strings.Contains(driverFullName, "mssql") {
+		return "mssql"
+	}
+	return driverFullName
 }
 
 // FindByKey finds a session by key
@@ -287,20 +238,52 @@ func (st *Store) SetJSON(key string, value interface{}) (bool, error) {
 	return st.Set(key, string(jsonValue))
 }
 
-func (st *Store) DriverName(db *sql.DB) string {
-	dv := reflect.ValueOf(db.Driver())
-	driverFullName := dv.Type().String()
-	if strings.Contains(driverFullName, "mysql") {
-		return "mysql"
+// SqlCreateTable returns a SQL string for creating the setting table
+func (st *Store) SqlCreateTable() string {
+	sqlMysql := `
+	CREATE TABLE IF NOT EXISTS ` + st.settingsTableName + ` (
+	  id varchar(40) NOT NULL PRIMARY KEY,
+	  setting_key varchar(40) NOT NULL,
+	  setting_value text,
+	  created_at datetime NOT NULL,
+	  updated_at datetime NOT NULL,
+	  deleted_at datetime
+	);
+	`
+
+	sqlPostgres := `
+	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
+	  "id" varchar(40) NOT NULL PRIMARY KEY,
+	  "setting_key" varchar(40) NOT NULL,
+	  "setting_value" text,
+	  "created_at" timestamptz(6) NOT NULL,
+	  "updated_at" timestamptz(6) NOT NULL,
+	  "deleted_at" timestamptz(6)
+	)
+	`
+
+	sqlSqlite := `
+	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
+	  "id" varchar(40) NOT NULL PRIMARY KEY,
+	  "setting_key" varchar(40) NOT NULL,
+	  "setting_value" text,
+	  "created_at" timestamptz(6) NOT NULL,
+	  "updated_at" timestamptz(6) NOT NULL,
+	  "deleted_at" timestamptz(6)
+	)
+	`
+
+	sql := "unsupported driver " + st.dbDriverName
+
+	if st.dbDriverName == "mysql" {
+		sql = sqlMysql
 	}
-	if strings.Contains(driverFullName, "postgres") || strings.Contains(driverFullName, "pq") {
-		return "postgres"
+	if st.dbDriverName == "postgres" {
+		sql = sqlPostgres
 	}
-	if strings.Contains(driverFullName, "sqlite") {
-		return "sqlite"
+	if st.dbDriverName == "sqlite" {
+		sql = sqlSqlite
 	}
-	if strings.Contains(driverFullName, "mssql") {
-		return "mssql"
-	}
-	return driverFullName
+
+	return sql
 }
