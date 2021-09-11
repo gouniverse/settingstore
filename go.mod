@@ -1,4 +1,4 @@
-module settingstore
+module github.com/gouniverse/settingstore
 
 go 1.17
 
