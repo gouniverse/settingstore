@@ -47,6 +47,7 @@ appName = settingsStore.Set("app.name", "Default Name")
 appUrl = settingsStore.Set("app.url", "")
 serverIp = settingsStore.Set("server.ip", "")
 serverPort = settingsStore.Set("server.port", "")
+```
 
 3. Check if required setting is setup
 ```
