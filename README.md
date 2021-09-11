@@ -3,7 +3,8 @@
 Saves settings in an SQL database. 
 
 ## Description
-Every application needs to preserve settings between multiple restartes. This package helps save the setting represented as key-value pairs in an SQL database.
+
+Every application needs to preserve settings between multiple restarts. This package helps save the setting represented as key-value pairs in an SQL database.
 
 ## Features
 
