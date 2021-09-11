@@ -3,6 +3,7 @@ package settingstore
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"reflect"
 	"strings"
@@ -46,21 +47,21 @@ func WithTableName(settingsTableName string) StoreOption {
 }
 
 // NewStore creates a new setting store
-func NewStore(opts ...StoreOption) *Store {
+func NewStore(opts ...StoreOption) (*Store, error) {
 	store := &Store{}
 	for _, opt := range opts {
 		opt(store)
 	}
 
 	if store.settingsTableName == "" {
-		log.Panic("Setting store: settingTableName is required")
+		errors.New("Setting store: settingTableName is required")
 	}
 
 	if store.automigrateEnabled {
 		store.AutoMigrate()
 	}
 
-	return store
+	return store, nil
 }
 
 // AutoMigrate auto migrate
