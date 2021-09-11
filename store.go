@@ -102,7 +102,7 @@ func (st *Store) FindByKey(key string) *Setting {
 	setting := &Setting{}
 	sqlStr, _, _ := goqu.From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Select(Setting{}).ToSQL()
 
-	log.Println(sqlStr)
+	// log.Println(sqlStr)
 
 	err := st.db.QueryRow(sqlStr).Scan(&setting.CreatedAt, &setting.DeletedAt, &setting.ID, &setting.Key, &setting.Value, &setting.UpdatedAt)
 	if err != nil {
@@ -152,7 +152,7 @@ func (st *Store) Keys() ([]string, error) {
 	// sqlStr, _, _ := goqu.From(st.settingsTableName).Order(goqu.I("setting_key").Asc()).Where(goqu.C("deleted_at").IsNull()).Select(Setting{}).ToSQL()
 	sqlStr, _, _ := goqu.From(st.settingsTableName).Order(goqu.I("setting_key").Asc()).Where(goqu.C("deleted_at").IsNull()).Select("setting_value").ToSQL()
 
-	log.Println(sqlStr)
+	// log.Println(sqlStr)
 
 	rows, err := st.db.Query(sqlStr)
 
@@ -181,7 +181,7 @@ func (st *Store) Keys() ([]string, error) {
 func (st *Store) Remove(key string) error {
 	sqlStr, _, _ := goqu.From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Delete().ToSQL()
 
-	log.Println(sqlStr)
+	// log.Println(sqlStr)
 
 	_, err := st.db.Exec(sqlStr)
 	if err != nil {
