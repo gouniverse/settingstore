@@ -33,7 +33,7 @@ settingStore.AutoMigrate()
 
 ## Usage
 
-1. Create a new key value pair
+1. Create a new key value setting pair
 ```
 settingsStore.Set("app.name", "My Web App")
 settingsStore.Set("app.url", "http://localhost")
@@ -41,7 +41,7 @@ settingsStore.Set("server.ip", "127.0.0.1")
 settingsStore.Set("server.port", "80")
 ```
 
-2. Retrieve an entity (or default value if not exists)
+2. Retrieve a setting value (or default value if not exists)
 ```
 appName = settingsStore.Set("app.name", "Default Name")
 appUrl = settingsStore.Set("app.url", "")
@@ -58,7 +58,7 @@ if serverIp == "" {
 
 ## Methods
 
-These methods may be subject to change
+These methods may be subject to change as still in development
 
 ### Store Methods
 
