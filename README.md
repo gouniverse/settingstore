@@ -1,8 +1,8 @@
 # Settings Store
 
-[![Tests Status](https://github.com/gouniverse/cachestore/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/gouniverse/sessionstore/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gouniverse/cachestore)](https://goreportcard.com/report/github.com/gouniverse/sessionstore)
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/gouniverse/cachestore)](https://pkg.go.dev/github.com/gouniverse/sessionstore)
+[![Tests Status](https://github.com/gouniverse/settingstore/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/gouniverse/settingstore/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gouniverse/settingstore)](https://goreportcard.com/report/github.com/gouniverse/settingstore)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/gouniverse/settingstore)](https://pkg.go.dev/github.com/gouniverse/settingstore)
 
 Saves settings in an SQL database. 
 
