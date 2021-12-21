@@ -18,6 +18,7 @@ type Store struct {
 	settingsTableName  string
 	dbDriverName       string
 	db                 *sql.DB
+	debug              bool
 	automigrateEnabled bool
 }
 
@@ -36,6 +37,13 @@ func WithDb(db *sql.DB) StoreOption {
 	return func(s *Store) {
 		s.db = db
 		s.dbDriverName = s.DriverName(s.db)
+	}
+}
+
+// WithDebug prints the SQL queries
+func WithDebug(debug bool) StoreOption {
+	return func(s *Store) {
+		s.debug = debug
 	}
 }
 
@@ -69,19 +77,31 @@ func (st *Store) AutoMigrate() error {
 
 	sql := st.SqlCreateTable()
 
+	if st.debug {
+		log.Println(sql)
+	}
+
 	_, err := st.db.Exec(sql)
 	if err != nil {
-		log.Println(err)
+		if st.debug {
+			log.Println(err)
+		}
 		return err
 	}
 
 	return nil
 }
 
+// EnableDebug - enables the debug option
+func (st *Store) EnableDebug(debug bool) {
+	st.debug = debug
+}
+
 // DriverName finds the driver name from database
 func (st *Store) DriverName(db *sql.DB) string {
 	dv := reflect.ValueOf(db.Driver())
 	driverFullName := dv.Type().String()
+
 	if strings.Contains(driverFullName, "mysql") {
 		return "mysql"
 	}
@@ -94,6 +114,7 @@ func (st *Store) DriverName(db *sql.DB) string {
 	if strings.Contains(driverFullName, "mssql") {
 		return "mssql"
 	}
+
 	return driverFullName
 }
 
@@ -102,7 +123,9 @@ func (st *Store) FindByKey(key string) *Setting {
 	setting := &Setting{}
 	sqlStr, _, _ := goqu.From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Select(Setting{}).ToSQL()
 
-	// log.Println(sqlStr)
+	if st.debug {
+		log.Println(sqlStr)
+	}
 
 	err := st.db.QueryRow(sqlStr).Scan(&setting.CreatedAt, &setting.DeletedAt, &setting.ID, &setting.Key, &setting.Value, &setting.UpdatedAt)
 	if err != nil {
