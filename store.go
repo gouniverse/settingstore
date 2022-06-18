@@ -121,7 +121,11 @@ func (st *Store) DriverName(db *sql.DB) string {
 // FindByKey finds a session by key
 func (st *Store) FindByKey(key string) *Setting {
 	setting := &Setting{}
-	sqlStr, _, _ := goqu.From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Select(Setting{}).ToSQL()
+
+	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName)
+	q = q.Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull())
+	q = q.Select(Setting{})
+	sqlStr, _, _ := q.ToSQL()
 
 	if st.debug {
 		log.Println(sqlStr)
@@ -173,7 +177,11 @@ func (st *Store) Keys() ([]string, error) {
 	keys := []string{}
 	// settingList := []Setting{}
 	// sqlStr, _, _ := goqu.From(st.settingsTableName).Order(goqu.I("setting_key").Asc()).Where(goqu.C("deleted_at").IsNull()).Select(Setting{}).ToSQL()
-	sqlStr, _, _ := goqu.From(st.settingsTableName).Order(goqu.I("setting_key").Asc()).Where(goqu.C("deleted_at").IsNull()).Select("setting_value").ToSQL()
+	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName)
+	q = q.Order(goqu.I("setting_key").Asc())
+	q = q.Where(goqu.C("deleted_at").IsNull())
+	q = q.Select("setting_value")
+	sqlStr, _, _ := q.ToSQL()
 
 	// log.Println(sqlStr)
 
@@ -202,7 +210,9 @@ func (st *Store) Keys() ([]string, error) {
 
 // Remove gets a JSON key from cache
 func (st *Store) Remove(key string) error {
-	sqlStr, _, _ := goqu.From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Delete().ToSQL()
+
+	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Delete()
+	sqlStr, _, _ := q.ToSQL()
 
 	// log.Println(sqlStr)
 
