@@ -152,7 +152,7 @@ func Test_Store_SetJSON(t *testing.T) {
 
 func Test_Store_Remove(t *testing.T) {
 	db := InitDB("test_settingsTableName.db")
-	s, _ := NewStore(WithDb(db), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
+	s, _ := NewStore(WithDb(db), WithTableName("settings_test_autoremove"), WithAutoMigrate(true))
 
 	key := "1234z"
 	val := "123zx"
@@ -163,7 +163,10 @@ func Test_Store_Remove(t *testing.T) {
 	}
 
 	s.Remove(key)
-	ret := s.Get(key, "default")
+	ret, err := s.Get(key, "default")
+	if err != nil {
+		t.Fatalf("No errors are expected but %s", err.Error())
+	}
 	if ret != "default" {
 		t.Fatalf("Unable to delete!!! Entry Persists")
 	}
@@ -181,7 +184,12 @@ func Test_Store_Get(t *testing.T) {
 		t.Fatalf("Failure: Set")
 	}
 
-	ret := s.Get(key, "default")
+	ret, err := s.Get(key, "default")
+
+	if err != nil {
+		t.Fatalf("No errors are expected but %s", err.Error())
+	}
+
 	if ret != val {
 		t.Fatalf("Unable to Get: Expected [%v] Received [%v]", val, ret)
 	}
@@ -198,7 +206,12 @@ func Test_Store_FindByKey(t *testing.T) {
 	if !ok {
 		t.Fatalf("Failure: Set")
 	}
-	meta := s.FindByKey(key)
+
+	meta, err := s.FindByKey(key)
+	if err != nil {
+		t.Fatalf("No errors are expected but %s", err.Error())
+	}
+
 	if meta == nil {
 		t.Fatalf("NIL Record Received")
 	}
@@ -215,7 +228,12 @@ func Test_Store_GetJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("Failure: Set")
 	}
-	ret := s.GetJSON(key, nil)
+	ret, err := s.GetJSON(key, nil)
+
+	if err != nil {
+		t.Fatalf("No errors are expected but %s", err.Error())
+	}
+
 	if ret == nil {
 		t.Fatalf("Failure getting JSON value")
 	}

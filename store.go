@@ -1,6 +1,7 @@
 package settingstore
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/georgysavva/scany/sqlscan"
 	"github.com/gouniverse/uid"
 )
 
@@ -119,57 +121,70 @@ func (st *Store) DriverName(db *sql.DB) string {
 }
 
 // FindByKey finds a session by key
-func (st *Store) FindByKey(key string) *Setting {
-	setting := &Setting{}
-
+func (st *Store) FindByKey(key string) (*Setting, error) {
 	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName)
 	q = q.Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull())
-	q = q.Select(Setting{})
-	sqlStr, _, _ := q.ToSQL()
+	q = q.Select("*")
+	q = q.Limit(1)
+	sqlStr, _, sqlBuilderErr := q.ToSQL()
+
+	if sqlBuilderErr != nil {
+		return nil, sqlBuilderErr
+	}
 
 	if st.debug {
 		log.Println(sqlStr)
 	}
 
-	err := st.db.QueryRow(sqlStr).Scan(&setting.CreatedAt, &setting.DeletedAt, &setting.ID, &setting.Key, &setting.Value, &setting.UpdatedAt)
+	var setting Setting
+	err := sqlscan.Get(context.Background(), st.db, &setting, sqlStr)
+
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil
+		if err.Error() == sql.ErrNoRows.Error() {
+			return nil, nil
 		}
-		log.Fatal("Failed to execute query: ", err)
-		return nil
+		//log.Fatal("Failed to execute query: ", err)
+		return nil, err
 	}
 
-	return setting
+	return &setting, nil
 }
 
 // Get gets a key from settings
-func (st *Store) Get(key string, valueDefault string) string {
-	setting := st.FindByKey(key)
+func (st *Store) Get(key string, valueDefault string) (string, error) {
+	setting, err := st.FindByKey(key)
 
-	if setting != nil {
-		return setting.Value
+	if err != nil {
+		return valueDefault, err
 	}
 
-	return valueDefault
+	if setting != nil {
+		return setting.Value, nil
+	}
+
+	return valueDefault, nil
 }
 
 // GetJSON gets a JSON key from setting
-func (st *Store) GetJSON(key string, valueDefault interface{}) interface{} {
-	setting := st.FindByKey(key)
+func (st *Store) GetJSON(key string, valueDefault interface{}) (interface{}, error) {
+	setting, err := st.FindByKey(key)
+
+	if err != nil {
+		return valueDefault, err
+	}
 
 	if setting != nil {
 		jsonValue := setting.Value
 		var e interface{}
 		jsonError := json.Unmarshal([]byte(jsonValue), e)
 		if jsonError != nil {
-			return valueDefault
+			return valueDefault, jsonError
 		}
 
-		return e
+		return e, nil
 	}
 
-	return valueDefault
+	return valueDefault, nil
 }
 
 // Keys gets all keys sorted alphabetically
@@ -230,7 +245,11 @@ func (st *Store) Remove(key string) error {
 
 // Set sets new key value pair
 func (st *Store) Set(key string, value string) (bool, error) {
-	setting := st.FindByKey(key)
+	setting, errFindByKey := st.FindByKey(key)
+
+	if errFindByKey != nil {
+		return false, errFindByKey
+	}
 
 	// log.Println(setting)
 
