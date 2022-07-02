@@ -64,7 +64,7 @@ func NewStore(opts ...StoreOption) (*Store, error) {
 	}
 
 	if store.settingsTableName == "" {
-		errors.New("Setting store: settingTableName is required")
+		return nil, errors.New("Setting store: settingTableName is required")
 	}
 
 	if store.automigrateEnabled {
@@ -143,7 +143,7 @@ func (st *Store) FindByKey(key string) (*Setting, error) {
 		if err.Error() == sql.ErrNoRows.Error() {
 			return nil, nil
 		}
-		//log.Fatal("Failed to execute query: ", err)
+
 		return nil, err
 	}
 
@@ -175,12 +175,13 @@ func (st *Store) GetJSON(key string, valueDefault interface{}) (interface{}, err
 
 	if setting != nil {
 		jsonValue := setting.Value
+
 		var e interface{}
-		jsonError := json.Unmarshal([]byte(jsonValue), e)
+		jsonError := json.Unmarshal([]byte(jsonValue), &e)
 		if jsonError != nil {
+			log.Println("ERRROR")
 			return valueDefault, jsonError
 		}
-
 		return e, nil
 	}
 
@@ -227,7 +228,11 @@ func (st *Store) Keys() ([]string, error) {
 func (st *Store) Remove(key string) error {
 
 	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Delete()
-	sqlStr, _, _ := q.ToSQL()
+	sqlStr, _, sqlBuildErr := q.ToSQL()
+
+	if sqlBuildErr != nil {
+		return sqlBuildErr
+	}
 
 	// log.Println(sqlStr)
 
@@ -296,7 +301,7 @@ func (st *Store) SqlCreateTable() string {
 	sqlMysql := `
 	CREATE TABLE IF NOT EXISTS ` + st.settingsTableName + ` (
 	  id varchar(40) NOT NULL PRIMARY KEY,
-	  setting_key varchar(40) NOT NULL,
+	  setting_key varchar(255) NOT NULL,
 	  setting_value text,
 	  created_at datetime NOT NULL,
 	  updated_at datetime NOT NULL,
@@ -307,7 +312,7 @@ func (st *Store) SqlCreateTable() string {
 	sqlPostgres := `
 	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
 	  "id" varchar(40) NOT NULL PRIMARY KEY,
-	  "setting_key" varchar(40) NOT NULL,
+	  "setting_key" varchar(255) NOT NULL,
 	  "setting_value" text,
 	  "created_at" timestamptz(6) NOT NULL,
 	  "updated_at" timestamptz(6) NOT NULL,
@@ -318,11 +323,11 @@ func (st *Store) SqlCreateTable() string {
 	sqlSqlite := `
 	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
 	  "id" varchar(40) NOT NULL PRIMARY KEY,
-	  "setting_key" varchar(40) NOT NULL,
+	  "setting_key" varchar(255) NOT NULL,
 	  "setting_value" text,
-	  "created_at" timestamptz(6) NOT NULL,
-	  "updated_at" timestamptz(6) NOT NULL,
-	  "deleted_at" timestamptz(6)
+	  "created_at" datetime  NOT NULL,
+	  "updated_at" datetime  NOT NULL,
+	  "deleted_at" datetime
 	)
 	`
 

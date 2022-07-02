@@ -218,8 +218,8 @@ func Test_Store_FindByKey(t *testing.T) {
 }
 
 func Test_Store_GetJSON(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
-	s, _ := NewStore(WithDb(db), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
+	db := InitDB("test_GetJSON.db")
+	s, _ := NewStore(WithDb(db), WithTableName("setting_get_json"), WithAutoMigrate(true))
 
 	key := "1234z"
 	val := `{"a" : "b", "c" : "d"}`
@@ -228,13 +228,18 @@ func Test_Store_GetJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("Failure: Set")
 	}
+
 	ret, err := s.GetJSON(key, nil)
 
 	if err != nil {
-		t.Fatalf("No errors are expected but %s", err.Error())
+		t.Fatalf("No errors are expected but error thrown: %s", err.Error())
 	}
 
 	if ret == nil {
 		t.Fatalf("Failure getting JSON value")
+	}
+
+	if ret != val {
+		t.Fatalf("Retrieved value not the same as set value")
 	}
 }
