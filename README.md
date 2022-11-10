@@ -47,10 +47,10 @@ settingsStore.Set("server.port", "80")
 
 2. Retrieve a setting value (or default value if not exists)
 ```
-appName = settingsStore.Set("app.name", "Default Name")
-appUrl = settingsStore.Set("app.url", "")
-serverIp = settingsStore.Set("server.ip", "")
-serverPort = settingsStore.Set("server.port", "")
+appName = settingsStore.Get("app.name", "Default Name")
+appUrl = settingsStore.Get("app.url", "")
+serverIp = settingsStore.Get("server.ip", "")
+serverPort = settingsStore.Get("server.port", "")
 ```
 
 3. Check if required setting is setup
