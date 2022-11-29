@@ -234,7 +234,9 @@ func (st *Store) Remove(key string) error {
 		return sqlBuildErr
 	}
 
-	// log.Println(sqlStr)
+	if st.debug {
+		log.Println(sqlStr)
+	}
 
 	_, err := st.db.Exec(sqlStr)
 	if err != nil {
@@ -274,7 +276,9 @@ func (st *Store) Set(key string, value string) (bool, error) {
 		sqlStr, _, _ = goqu.Update(st.settingsTableName).Set(setting).ToSQL()
 	}
 
-	// log.Println(sqlStr)
+	if st.debug {
+		log.Println(sqlStr)
+	}
 
 	_, err := st.db.Exec(sqlStr)
 
