@@ -141,6 +141,11 @@ func (st *Store) FindByKey(key string) (*Setting, error) {
 
 	if err != nil {
 		if err.Error() == sql.ErrNoRows.Error() {
+			// sqlscan does not use this anymore
+			return nil, nil
+		}
+
+		if sqlscan.NotFound(err) {
 			return nil, nil
 		}
 
@@ -226,7 +231,6 @@ func (st *Store) Keys() ([]string, error) {
 
 // Remove gets a JSON key from cache
 func (st *Store) Remove(key string) error {
-
 	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Delete()
 	sqlStr, _, sqlBuildErr := q.ToSQL()
 
@@ -240,9 +244,15 @@ func (st *Store) Remove(key string) error {
 
 	_, err := st.db.Exec(sqlStr)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err.Error() == sql.ErrNoRows.Error() {
+			// sqlscan does not use this anymore
 			return nil
 		}
+
+		if sqlscan.NotFound(err) {
+			return nil
+		}
+
 		log.Fatal("Failed to execute query: ", err)
 		return nil
 	}
