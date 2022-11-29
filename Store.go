@@ -267,8 +267,6 @@ func (st *Store) Set(key string, value string) (bool, error) {
 		return false, errFindByKey
 	}
 
-	// log.Println(setting)
-
 	var sqlStr string
 	if setting == nil {
 		var newSetting = Setting{
@@ -282,7 +280,7 @@ func (st *Store) Set(key string, value string) (bool, error) {
 	} else {
 		setting.Value = value
 		setting.UpdatedAt = time.Now()
-		sqlStr, _, _ = goqu.Update(st.settingsTableName).Set(setting).ToSQL()
+		sqlStr, _, _ = goqu.Update(st.settingsTableName).Where(goqu.C("id").Eq(setting.ID)).Set(setting).ToSQL()
 	}
 
 	if st.debug {
@@ -292,7 +290,9 @@ func (st *Store) Set(key string, value string) (bool, error) {
 	_, err := st.db.Exec(sqlStr)
 
 	if err != nil {
-		log.Println(err)
+		if st.debug {
+			log.Println(err)
+		}
 		return false, err
 	}
 
