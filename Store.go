@@ -196,15 +196,17 @@ func (st *Store) GetJSON(key string, valueDefault interface{}) (interface{}, err
 // Keys gets all keys sorted alphabetically
 func (st *Store) Keys() ([]string, error) {
 	keys := []string{}
-	// settingList := []Setting{}
-	// sqlStr, _, _ := goqu.From(st.settingsTableName).Order(goqu.I("setting_key").Asc()).Where(goqu.C("deleted_at").IsNull()).Select(Setting{}).ToSQL()
-	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName)
-	q = q.Order(goqu.I("setting_key").Asc())
-	q = q.Where(goqu.C("deleted_at").IsNull())
-	q = q.Select("setting_value")
+	
+	q := goqu.Dialect(st.dbDriverName).
+		From(st.settingsTableName).
+		Order(goqu.I("setting_key").Asc()).
+		Where(goqu.C("deleted_at").IsNull()).
+		Select("setting_key")
 	sqlStr, _, _ := q.ToSQL()
 
-	// log.Println(sqlStr)
+	if st.debug {
+		log.Println(sqlStr)
+	}
 
 	rows, err := st.db.Query(sqlStr)
 
@@ -213,18 +215,15 @@ func (st *Store) Keys() ([]string, error) {
 	}
 
 	for rows.Next() {
-		var value string
-		err := rows.Scan(&value)
+		var key string
+		err := rows.Scan(&key)
+
 		if err != nil {
 			return keys, err
 		}
-		// settingList = append(settingList, value)
-		keys = append(keys, value)
-	}
 
-	// for _, setting := range settingList {
-	// 	keys = append(keys, setting.Key)
-	// }
+		keys = append(keys, key)
+	}
 
 	return keys, nil
 }
