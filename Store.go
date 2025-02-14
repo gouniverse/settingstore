@@ -82,9 +82,7 @@ func (st *store) Delete(settingKey string) error {
 		return err
 	}
 
-	if st.debugEnabled {
-		log.Println(sqlStr)
-	}
+	st.logSql("delete", sqlStr, sqlParams)
 
 	_, err = st.db.Exec(sqlStr, sqlParams...)
 
@@ -543,7 +541,7 @@ func (store *store) SettingUpdate(setting SettingInterface) error {
 	return nil
 }
 
-// Deprecated: Set sets a key in store
+// Set sets a key in store
 func (st *store) Set(settingKey string, value string, seconds int64) error {
 	setting, errFindByKey := st.FindByKey(settingKey)
 
@@ -565,7 +563,7 @@ func (st *store) Set(settingKey string, value string, seconds int64) error {
 	}
 }
 
-// Deprecated: SetAny convenience method which saves the supplied interface value, use GetAny to extract
+// SetAny convenience method which saves the supplied interface value, use GetAny to extract
 // Internally it serializes the data to JSON
 func (st *store) SetAny(key string, value interface{}, seconds int64) error {
 	jsonValue, jsonError := json.Marshal(value)
@@ -576,7 +574,7 @@ func (st *store) SetAny(key string, value interface{}, seconds int64) error {
 	return st.Set(key, string(jsonValue), seconds)
 }
 
-// Deprecated: SetMap convenience method which saves the supplied map, use GetMap to extract
+// SetMap convenience method which saves the supplied map, use GetMap to extract
 func (st *store) SetMap(key string, value map[string]any, seconds int64) error {
 	jsonValue, jsonError := json.Marshal(value)
 	if jsonError != nil {

@@ -39,11 +39,26 @@ go get -u github.com/gouniverse/settingstore
 
 ```
 // as one line
-settingStore = settingstore.NewStore(settingstore.WithDb(databaseInstance), settingstore.WithTableName("settings"), entitystore.WithAutoMigrate(true))
+settingStore, err = settingstore.NewStore(settingstore.NewStoreOptions{
+	DB: databaseInstance,
+	SettingTableName: "settings",
+	AutomigrateEnabled: true,
+})
 
+if err != nil {
+	panic(err)
+}
 
 // as multiple lines
-settingStore = settingstore.NewStore(settingstore.WithDb(databaseInstance), settingstore.WithTableName("settings"))
+settingStore, err = settingstore.NewStore(settingstore.NewStoreOptions{
+	DB: databaseInstance,
+	SettingTableName: "settings",
+})
+
+if err != nil {
+	panic(err)
+}
+
 settingStore.AutoMigrate()
 
 ```
@@ -79,22 +94,36 @@ These methods may be subject to change as still in development
 
 ### Store Methods
 
-- NewStore(opts ...StoreOption) *Store - creates a new setting store
-- WithAutoMigrate(automigrateEnabled bool) StoreOption - a store option. sets whether database migration will run on setup
-- WithDb(db *sql.DB) StoreOption - a store option (required). sets the DB to be used by the store
-- WithTableName(settingsTableName string) StoreOption - a store option (required). sets the table name for the setting store in the DB
+- NewStore(opts NewStoreOptions) (*store, error) - creates a new setting store
 
 - AutoMigrate() error - auto migrate (create the tables in the database) the settings store tables
 - DriverName(db *sql.DB) string - the name of the driver used for SQL strings (you may use this if you need to debug)
 - SqlCreateTable() string - SQL string for creating the tables (you may use this string if you want to set your own migrations)
+- SettingCount(options SettingQueryInterface) (int64, error) - counts the number of settings
+- SettingCreate(setting SettingInterface) error - creates a new setting
+- SettingDelete(setting SettingInterface) error - deletes a setting
+- SettingDeleteByID(id string) error - deletes a setting by ID
+- SettingDeleteByKey(settingKey string) error - deletes a setting by key
+- SettingFindByID(settingID string) (SettingInterface, error) - finds a setting by ID
+- SettingList(query SettingQueryInterface) ([]SettingInterface, error) - lists settings
+- SettingSoftDelete(setting SettingInterface) error - soft deletes a setting
+- SettingSoftDeleteByID(id string) error - soft deletes a setting by ID
+- SettingUpdate(setting SettingInterface) error - updates a setting
 
 ### Setting Methods
 
 - Delete() bool - deletes the entity
-- FindByKey(key string) *Setting - finds a Setting by key
-- Get(key string, valueDefault string) string - gets a value from key-value setting pair
-- GetJSON(key string, valueDefault interface{}) interface{} - gets a value as JSON from key-value setting pair
+- FindByKey(key string) (SettingInterface, error) - finds a Setting by key
+- GetJSON(key string, valueDefault interface{}) (interface{}, error) - gets a value as JSON from key-value setting pair
 - Keys() ([]string, error) - gets all keys sorted alphabetically (useful if you want to list these in admin panel)
 - Remove(key string) error - removes a setting from store
-- Set(key string, value string) (bool, error) - sets new key value pair
-- SetJSON(key string, value interface{}) (bool, error) - sets new key JSON value pair
+
+### Shortcut Methods
+
+- Get(key string, valueDefault string) (string, error) - gets a value from key-value setting pair
+- Set(key string, value string, seconds int64) error - sets new key value pair
+- SetJSON(key string, value interface{}, seconds int64) error - sets new key JSON value pair
+- GetAny(key string, valueDefault interface{}) (interface{}, error) - gets a value from key-value setting pair
+- GetMap(key string, valueDefault map[string]any) (map[string]any, error) - gets a value as JSON from key-value setting pair
+- Has(settingKey string) (bool, error) - checks if a setting exists
+- MergeMap(key string, mergeMap map[string]any, seconds int64) error - merges a map with an existing map
