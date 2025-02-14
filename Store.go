@@ -1,93 +1,55 @@
 package settingstore
 
 import (
-	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"log"
-	"reflect"
-	"strings"
-	"time"
+	"strconv"
 
 	"github.com/doug-martin/goqu/v9"
-	"github.com/georgysavva/scany/sqlscan"
-	"github.com/gouniverse/uid"
+	_ "github.com/doug-martin/goqu/v9/dialect/mysql"     // importing mysql dialect
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"  // importing postgres dialect
+	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"   // importing sqlite3 dialect
+	_ "github.com/doug-martin/goqu/v9/dialect/sqlserver" // importing sqlserver dialect
+	"github.com/dromara/carbon/v2"
+	"github.com/gouniverse/sb"
+	"github.com/samber/lo"
 )
 
-// Store defines a session store
-type Store struct {
+// == INTERFACE ===============================================================
+
+var _ StoreInterface = (*store)(nil) // verify it extends the store interface
+
+// == TYPE ====================================================================
+
+// Store defines a setting store
+type store struct {
 	settingsTableName  string
-	dbDriverName       string
 	db                 *sql.DB
-	debug              bool
+	dbDriverName       string
+	timeoutSeconds     int64
 	automigrateEnabled bool
+	debugEnabled       bool
+	// sqlLogger          *slog.Logger // slog is not defined
 }
 
-// StoreOption options for the vault store
-type StoreOption func(*Store)
-
-// WithAutoMigrate sets the table name for the cache store
-func WithAutoMigrate(automigrateEnabled bool) StoreOption {
-	return func(s *Store) {
-		s.automigrateEnabled = automigrateEnabled
-	}
-}
-
-// WithDb sets the database for the setting store
-func WithDb(db *sql.DB) StoreOption {
-	return func(s *Store) {
-		s.db = db
-		s.dbDriverName = s.DriverName(s.db)
-	}
-}
-
-// WithDebug prints the SQL queries
-func WithDebug(debug bool) StoreOption {
-	return func(s *Store) {
-		s.debug = debug
-	}
-}
-
-// WithTableName sets the table name for the cache store
-func WithTableName(settingsTableName string) StoreOption {
-	return func(s *Store) {
-		s.settingsTableName = settingsTableName
-	}
-}
-
-// NewStore creates a new setting store
-func NewStore(opts ...StoreOption) (*Store, error) {
-	store := &Store{}
-	for _, opt := range opts {
-		opt(store)
-	}
-
-	if store.settingsTableName == "" {
-		return nil, errors.New("Setting store: settingTableName is required")
-	}
-
-	if store.automigrateEnabled {
-		store.AutoMigrate()
-	}
-
-	return store, nil
-}
+// PUBLIC METHODS ============================================================
 
 // AutoMigrate auto migrate
-func (st *Store) AutoMigrate() error {
+func (store *store) AutoMigrate() error {
+	sqlStr := store.SQLCreateTable()
 
-	sql := st.SqlCreateTable()
-
-	if st.debug {
-		log.Println(sql)
+	if sqlStr == "" {
+		return errors.New("setting store: table create sql is empty")
 	}
 
-	_, err := st.db.Exec(sql)
+	if store.db == nil {
+		return errors.New("setting store: database is nil")
+	}
+
+	_, err := store.db.Exec(sqlStr)
+
 	if err != nil {
-		if st.debug {
-			log.Println(err)
-		}
 		return err
 	}
 
@@ -95,266 +57,269 @@ func (st *Store) AutoMigrate() error {
 }
 
 // EnableDebug - enables the debug option
-func (st *Store) EnableDebug(debug bool) {
-	st.debug = debug
+func (st *store) EnableDebug(debug bool) {
+	st.debugEnabled = debug
 }
 
-// DriverName finds the driver name from database
-func (st *Store) DriverName(db *sql.DB) string {
-	dv := reflect.ValueOf(db.Driver())
-	driverFullName := dv.Type().String()
+func (store *store) SettingCount() (int64, error) {
+	q, _, err := store.settingSelectQuery(SettingQuery())
 
-	if strings.Contains(driverFullName, "mysql") {
-		return "mysql"
-	}
-	if strings.Contains(driverFullName, "postgres") || strings.Contains(driverFullName, "pq") {
-		return "postgres"
-	}
-	if strings.Contains(driverFullName, "sqlite") {
-		return "sqlite"
-	}
-	if strings.Contains(driverFullName, "mssql") {
-		return "mssql"
+	if err != nil {
+		return -1, err
 	}
 
-	return driverFullName
-}
+	sqlStr, params, errSql := q.Prepared(true).
+		Limit(1).
+		Select(goqu.COUNT(goqu.Star()).As("count")).
+		ToSQL()
 
-// FindByKey finds a session by key
-func (st *Store) FindByKey(key string) (*Setting, error) {
-	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName)
-	q = q.Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull())
-	q = q.Select("*")
-	q = q.Limit(1)
-	sqlStr, _, sqlBuilderErr := q.ToSQL()
-
-	if sqlBuilderErr != nil {
-		return nil, sqlBuilderErr
+	if errSql != nil {
+		return -1, nil
 	}
 
-	if st.debug {
+	if store.debugEnabled {
 		log.Println(sqlStr)
 	}
 
-	var setting Setting
-	err := sqlscan.Get(context.Background(), st.db, &setting, sqlStr)
+	db := sb.NewDatabase(store.db, store.dbDriverName)
+	mapped, err := db.SelectToMapString(sqlStr, params...)
+	if err != nil {
+		return -1, err
+	}
+
+	if len(mapped) < 1 {
+		return -1, nil
+	}
+
+	countStr := mapped[0]["count"]
+
+	i, err := strconv.ParseInt(countStr, 10, 64)
 
 	if err != nil {
-		if err.Error() == sql.ErrNoRows.Error() {
-			// sqlscan does not use this anymore
-			return nil, nil
-		}
+		return -1, err
 
-		if sqlscan.NotFound(err) {
-			return nil, nil
-		}
+	}
 
+	return i, nil
+}
+
+func (st *store) SettingCreate(setting SettingInterface) error {
+	if setting == nil {
+		return errors.New("settingstore > setting create. setting cannot be nil")
+	}
+
+	if setting.GetKey() == "" {
+		return errors.New("settingstore > setting create. key cannot be empty")
+	}
+
+	if setting.GetCreatedAt() == "" {
+		setting.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString())
+	}
+
+	if setting.GetUpdatedAt() == "" {
+		setting.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString())
+	}
+
+	data := setting.Data()
+
+	sqlStr, sqlParams, sqlErr := goqu.Dialect(st.dbDriverName).
+		Insert(st.settingsTableName).
+		Prepared(true).
+		Rows(data).
+		ToSQL()
+
+	if sqlErr != nil {
+		return sqlErr
+	}
+
+	st.logSql("create", sqlStr, sqlParams...)
+
+	_, err := st.db.Exec(sqlStr, sqlParams...)
+
+	if err != nil {
+		return err
+	}
+
+	// setting.MarkAsNotDirty() // MarkAsNotDirty is not defined
+
+	return nil
+}
+
+// SettingDelete deletes a setting
+func (store *store) SettingDelete(setting SettingInterface) error {
+	if setting == nil {
+		return errors.New("setting is nil")
+	}
+
+	return store.SettingDeleteByID(setting.GetID())
+}
+
+// SettingDeleteByID deletes a setting by id
+func (store *store) SettingDeleteByID(id string) error {
+	if id == "" {
+		return errors.New("setting id is empty")
+	}
+
+	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
+		Delete(store.settingsTableName).
+		Prepared(true).
+		Where(goqu.C(COLUMN_ID).Eq(id)).
+		ToSQL()
+
+	if errSql != nil {
+		return errSql
+	}
+
+	store.logSql("delete", sqlStr, params...)
+
+	_, err := store.db.Exec(sqlStr, params...)
+
+	return err
+}
+
+// SettingFindByID finds a setting by id
+func (store *store) SettingFindByID(settingID string) (SettingInterface, error) {
+	if settingID == "" {
+		return nil, errors.New("setting store > find by id: setting id is required")
+	}
+
+	query := SettingQuery()
+	query.SetID(settingID)
+	query.SetLimit(1)
+
+	list, err := store.SettingList(query)
+
+	if err != nil {
 		return nil, err
 	}
 
-	return &setting, nil
+	if len(list) > 0 {
+		return list[0], nil
+	}
+
+	return nil, nil
 }
 
-// Get gets a key from settings
-func (st *Store) Get(key string, valueDefault string) (string, error) {
-	setting, err := st.FindByKey(key)
+func (store *store) SettingList(query SettingQueryInterface) ([]SettingInterface, error) {
+
+	q, columns, err := store.settingSelectQuery(query)
 
 	if err != nil {
-		return valueDefault, err
+		return []SettingInterface{}, err
 	}
 
-	if setting != nil {
-		return setting.Value, nil
+	sqlStr, sqlParams, errSql := q.Prepared(true).Select(columns...).ToSQL()
+
+	if errSql != nil {
+		return []SettingInterface{}, nil
 	}
 
-	return valueDefault, nil
+	store.logSql("list", sqlStr, sqlParams...)
+
+	if store.db == nil {
+		return []SettingInterface{}, errors.New("settingstore: database is nil")
+	}
+
+	db := sb.NewDatabase(store.db, store.dbDriverName)
+
+	if db == nil {
+		return []SettingInterface{}, errors.New("settingstore: database is nil")
+	}
+
+	modelMaps, err := db.SelectToMapString(sqlStr, sqlParams...)
+
+	if err != nil {
+		return []SettingInterface{}, err
+	}
+
+	list := []SettingInterface{}
+
+	lo.ForEach(modelMaps, func(modelMap map[string]string, index int) {
+		model := NewSettingFromExistingData(modelMap)
+		list = append(list, model)
+	})
+
+	return list, nil
 }
 
-// GetJSON gets a JSON key from setting
-func (st *Store) GetJSON(key string, valueDefault interface{}) (interface{}, error) {
-	setting, err := st.FindByKey(key)
-
-	if err != nil {
-		return valueDefault, err
+func (store *store) SettingUpdate(setting SettingInterface) error {
+	if setting == nil {
+		return errors.New("settingstore > setting update. setting cannot be nil")
 	}
 
-	if setting != nil {
-		jsonValue := setting.Value
-
-		var e interface{}
-		jsonError := json.Unmarshal([]byte(jsonValue), &e)
-		if jsonError != nil {
-			log.Println("ERRROR")
-			return valueDefault, jsonError
-		}
-		return e, nil
+	if store.db == nil {
+		return errors.New("settingstore > setting update. db cannot be nil")
 	}
 
-	return valueDefault, nil
-}
+	setting.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-// Keys gets all keys sorted alphabetically
-func (st *Store) Keys() ([]string, error) {
-	keys := []string{}
-	
-	q := goqu.Dialect(st.dbDriverName).
-		From(st.settingsTableName).
-		Order(goqu.I("setting_key").Asc()).
-		Where(goqu.C("deleted_at").IsNull()).
-		Select("setting_key")
-	sqlStr, _, _ := q.ToSQL()
+	dataChanged := setting.DataChanged()
 
-	if st.debug {
-		log.Println(sqlStr)
-	}
-
-	rows, err := st.db.Query(sqlStr)
-
-	if err != nil {
-		return keys, err
-	}
-
-	for rows.Next() {
-		var key string
-		err := rows.Scan(&key)
-
-		if err != nil {
-			return keys, err
-		}
-
-		keys = append(keys, key)
-	}
-
-	return keys, nil
-}
-
-// Remove gets a JSON key from cache
-func (st *Store) Remove(key string) error {
-	q := goqu.Dialect(st.dbDriverName).From(st.settingsTableName).Where(goqu.C("setting_key").Eq(key), goqu.C("deleted_at").IsNull()).Delete()
-	sqlStr, _, sqlBuildErr := q.ToSQL()
-
-	if sqlBuildErr != nil {
-		return sqlBuildErr
-	}
-
-	if st.debug {
-		log.Println(sqlStr)
-	}
-
-	_, err := st.db.Exec(sqlStr)
-	if err != nil {
-		if err.Error() == sql.ErrNoRows.Error() {
-			// sqlscan does not use this anymore
-			return nil
-		}
-
-		if sqlscan.NotFound(err) {
-			return nil
-		}
-
-		log.Fatal("Failed to execute query: ", err)
+	if len(dataChanged) == 0 {
 		return nil
+	}
+
+	delete(dataChanged, COLUMN_ID) // ID cannot be updated
+
+	sqlStr, sqlParams, sqlErr := goqu.Dialect(store.dbDriverName).
+		Update(store.settingsTableName).
+		Prepared(true).
+		Where(goqu.C(COLUMN_KEY).Eq(setting.GetKey())).
+		Where(goqu.C(COLUMN_ID).Eq(setting.GetID())).
+		Set(dataChanged).
+		ToSQL()
+
+	if sqlErr != nil {
+		return sqlErr
+	}
+
+	store.logSql("update", sqlStr, sqlParams...)
+
+	_, err := store.db.Exec(sqlStr, sqlParams...)
+
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// Set sets new key value pair
-func (st *Store) Set(key string, value string) (bool, error) {
-	setting, errFindByKey := st.FindByKey(key)
-
-	if errFindByKey != nil {
-		return false, errFindByKey
+func (store *store) settingSelectQuery(options SettingQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
+	if options == nil {
+		return nil, []any{}, errors.New("setting query: cannot be nil")
 	}
 
-	var sqlStr string
-	if setting == nil {
-		var newSetting = Setting{
-			ID:        uid.MicroUid(),
-			Key:       key,
-			Value:     value,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-		sqlStr, _, _ = goqu.Insert(st.settingsTableName).Rows(newSetting).ToSQL()
-	} else {
-		setting.Value = value
-		setting.UpdatedAt = time.Now()
-		sqlStr, _, _ = goqu.Update(st.settingsTableName).Where(goqu.C("id").Eq(setting.ID)).Set(setting).ToSQL()
+	q := goqu.Dialect(store.dbDriverName).From(store.settingsTableName)
+
+	columns = []any{}
+
+	for _, column := range options.Columns() {
+		columns = append(columns, column)
 	}
 
-	if st.debug {
-		log.Println(sqlStr)
-	}
-
-	_, err := st.db.Exec(sqlStr)
-
-	if err != nil {
-		if st.debug {
-			log.Println(err)
-		}
-		return false, err
-	}
-
-	return true, nil
+	return q, columns, nil
 }
 
-// SetJSON sets new key JSON value pair
-func (st *Store) SetJSON(key string, value interface{}) (bool, error) {
-	jsonValue, jsonError := json.Marshal(value)
-	if jsonError != nil {
-		return false, jsonError
+func (store *store) logSql(sqlOperationType string, sql string, params ...interface{}) {
+	if !store.debugEnabled {
+		return
 	}
 
-	return st.Set(key, string(jsonValue))
+	log.Println("sql: "+sqlOperationType, "sql", sql, "params", params)
+	// if store.sqlLogger != nil {
+	// 	store.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sql), slog.Any("params", params))
+	// } // slog is not defined
 }
 
-// SqlCreateTable returns a SQL string for creating the setting table
-func (st *Store) SqlCreateTable() string {
-	sqlMysql := `
-	CREATE TABLE IF NOT EXISTS ` + st.settingsTableName + ` (
-	  id varchar(40) NOT NULL PRIMARY KEY,
-	  setting_key varchar(255) NOT NULL,
-	  setting_value text,
-	  created_at datetime NOT NULL,
-	  updated_at datetime NOT NULL,
-	  deleted_at datetime
+// SQLCreateTable returns the create table sql
+func (store *store) SQLCreateTable() string {
+	return `
+	CREATE TABLE IF NOT EXISTS ` + store.settingsTableName + ` (
+		id VARCHAR(36) NOT NULL PRIMARY KEY,
+		key VARCHAR(255) NOT NULL,
+		value TEXT NULL,
+		created_at VARCHAR(255) NOT NULL,
+		updated_at VARCHAR(255) NOT NULL
 	);
 	`
-
-	sqlPostgres := `
-	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
-	  "id" varchar(40) NOT NULL PRIMARY KEY,
-	  "setting_key" varchar(255) NOT NULL,
-	  "setting_value" text,
-	  "created_at" timestamptz(6) NOT NULL,
-	  "updated_at" timestamptz(6) NOT NULL,
-	  "deleted_at" timestamptz(6)
-	)
-	`
-
-	sqlSqlite := `
-	CREATE TABLE IF NOT EXISTS "` + st.settingsTableName + `" (
-	  "id" varchar(40) NOT NULL PRIMARY KEY,
-	  "setting_key" varchar(255) NOT NULL,
-	  "setting_value" text,
-	  "created_at" datetime  NOT NULL,
-	  "updated_at" datetime  NOT NULL,
-	  "deleted_at" datetime
-	)
-	`
-
-	sql := "unsupported driver " + st.dbDriverName
-
-	if st.dbDriverName == "mysql" {
-		sql = sqlMysql
-	}
-	if st.dbDriverName == "postgres" {
-		sql = sqlPostgres
-	}
-	if st.dbDriverName == "sqlite" {
-		sql = sqlSqlite
-	}
-
-	return sql
 }
