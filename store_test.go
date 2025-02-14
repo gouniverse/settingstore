@@ -1,246 +1,592 @@
 package settingstore
 
 import (
+	"database/sql"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
-	"database/sql"
-
+	"github.com/gouniverse/sb"
+	"github.com/gouniverse/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func InitDB(filepath string) *sql.DB {
-	os.Remove(filepath) // remove database
+func initDB(filepath string) (*sql.DB, error) {
+	if filepath != ":memory:" && utils.FileExists(filepath) {
+		err := os.Remove(filepath) // remove database
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	dsn := filepath + "?parseTime=true"
 	db, err := sql.Open("sqlite3", dsn)
+
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return db
+	return db, nil
 }
 
-func InitStore() *Store {
-	db := InitDB("test_settingstore.db")
-	return &Store{
-		settingsTableName:  "test_settingsTableName.db",
-		dbDriverName:       "sql",
-		db:                 db,
-		debug:              false,
-		automigrateEnabled: false,
+func initStore(filepath string) (StoreInterface, error) {
+	db, err := initDB(filepath)
+
+	if err != nil {
+		return nil, err
 	}
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		SettingTableName:   "setting",
+		AutomigrateEnabled: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if store == nil {
+		return nil, errors.New("unexpected nil store")
+	}
+
+	return store, nil
 }
 
-func TestWithAutoMigrate(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
+func TestStore_Create(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	s := Store{
-		settingsTableName:  "test_settingsTableName.db",
-		dbDriverName:       "sql",
-		db:                 db,
-		debug:              false,
-		automigrateEnabled: false,
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
 	}
 
-	f := WithAutoMigrate(true)
-	f(&s)
-
-	if s.automigrateEnabled != true {
-		t.Fatalf("automigrateEnabled: Expected [true] received [%v]", s.automigrateEnabled)
-	}
-
-	s = Store{
-		settingsTableName:  "test_settingsTableName.db",
-		dbDriverName:       "sql",
-		db:                 db,
-		debug:              false,
-		automigrateEnabled: true,
-	}
-
-	f = WithAutoMigrate(false)
-	f(&s)
-
-	if s.automigrateEnabled == true {
-		t.Fatalf("automigrateEnabled: Expected [true] received [%v]", s.automigrateEnabled)
+	if store == nil {
+		t.Fatal("unexpected nil store")
 	}
 }
 
-func TestWithDb(t *testing.T) {
-	db := InitDB("test")
-	s := Store{
-		settingsTableName:  "test_settingsTableName.db",
-		dbDriverName:       "sql",
-		db:                 db,
-		debug:              false,
-		automigrateEnabled: true,
+func TestStore_Automigrate(t *testing.T) {
+	store, err := initStore(":memory:")
+
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
 	}
 
-	f := WithDb(db, "sqlite3")
-	f(&s)
+	err = store.AutoMigrate()
 
-	if s.db == nil {
-		t.Fatalf("DB: Expected Initialized DB, received [%v]", s.db)
-	}
-
-}
-
-func TestWithTableName(t *testing.T) {
-	s := Store{
-		settings: make(map[string]SettingInterface),
-		// settingsTableName:  "test_settingsTableName.db",
-		// dbDriverName:       "sql",
-		db: nil,
-		// debug:              false,
-		// automigrateEnabled: true,
-	}
-	table_name := "Table1"
-	f := WithTableName(table_name)
-	f(&s)
-	if s.settingsTableName != table_name {
-		t.Fatalf("Expected logTableName [%v], received [%v]", table_name, s.settingsTableName)
-	}
-	table_name = "Table2"
-	f = WithTableName(table_name)
-	f(&s)
-	if s.settingsTableName != table_name {
-		t.Fatalf("Expected logTableName [%v], received [%v]", table_name, s.settingsTableName)
+	if err != nil {
+		t.Fatal("Automigrate failed: " + err.Error())
 	}
 }
 
-func Test_Store_AutoMigrate(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
+func TestStore_EnableDebug(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
-
-	// s.AutoMigrate() // The AutoMigrate method does not exist on the Store struct
-
-	if s.settingsTableName != "log_with_automigrate" {
-		t.Fatalf("Expected logTableName [log_with_automigrate] received [%v]", s.settingsTableName)
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
 	}
-	if s.db == nil {
-		t.Fatalf("DB Init Failure")
-	}
-	if s.automigrateEnabled != true {
-		t.Fatalf("Failure:  WithAutoMigrate")
+
+	store.EnableDebug(true)
+
+	err = store.AutoMigrate()
+
+	if err != nil {
+		t.Fatal("Automigrate failed: " + err.Error())
 	}
 }
 
-func Test_Store_Set(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
+// func TestSetGetMap(t *testing.T) {
+// 	store, err := initStore(":memory:")
 
-	// key := "1234z"
-	// val := "123zx"
-	// ok, _ := s.Set(key, val)
+// 	if err != nil {
+// 		t.Fatal("Store could not be created: ", err.Error())
+// 	}
 
-	// if !ok {
-	// 	t.Fatalf("Failure: Set")
-	// }
+// 	value := map[string]any{
+// 		"key1": "value1",
+// 		"key2": "value2",
+// 		"key3": "value3",
+// 	}
+// 	err = store.SetMap("mykey", value, 5, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatalf("Set Map failed: " + err.Error())
+// 	}
+
+// 	result, err := store.GetMap("mykey", nil, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatalf("Get JSON failed: " + err.Error())
+// 	}
+
+// 	if result == nil {
+// 		t.Fatalf("GetMap failed: nil returned")
+// 	}
+
+// 	if result["key1"].(string) != value["key1"] {
+// 		t.Fatalf("Key1 not correct: " + result["key1"].(string))
+// 	}
+
+// 	if result["key2"] != value["key2"] {
+// 		t.Fatalf("Key2 not correct: " + result["key2"].(string))
+// 	}
+
+// 	if result["key3"] != value["key3"] {
+// 		t.Fatalf("Key3 not correct: " + result["key3"].(string))
+// 	}
+// }
+
+// func TestMergeMap(t *testing.T) {
+// 	store, err := initStore(":memory:")
+
+// 	if err != nil {
+// 		t.Fatal("Store could not be created: ", err.Error())
+// 	}
+
+// 	value := map[string]any{
+// 		"key1": "value1",
+// 		"key2": "value2",
+// 		"key3": "value3",
+// 	}
+// 	err = store.SetMap("mykey", value, 600, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatalf("Set Map failed: " + err.Error())
+// 	}
+
+// 	valueMerge := map[string]any{
+// 		"key2": "value22",
+// 		"key3": "value33",
+// 	}
+
+// 	err = store.MergeMap("mykey", valueMerge, 600, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatalf("Merge Map failed: " + err.Error())
+// 	}
+
+// 	result, err := store.GetMap("mykey", nil, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatalf("Get JSON failed: " + err.Error())
+// 	}
+
+// 	if result == nil {
+// 		t.Fatalf("GetMap failed: nil returned")
+// 	}
+
+// 	if result["key1"].(string) != value["key1"] {
+// 		t.Fatalf("Key1 not correct: " + result["key1"].(string))
+// 	}
+
+// 	if result["key2"].(string) != valueMerge["key2"] {
+// 		t.Fatalf("Key2 not correct: " + result["key2"].(string))
+// 	}
+
+// 	if result["key3"].(string) != valueMerge["key3"] {
+// 		t.Fatalf("Key3 not correct: " + result["key3"].(string))
+// 	}
+// }
+
+// func TestExtend(t *testing.T) {
+// 	store, err := initStore(":memory:")
+
+// 	if err != nil {
+// 		t.Fatal("Store could not be created: ", err.Error())
+// 	}
+
+// 	err = store.Set("mykey", "test", 5, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatal("Set failed: " + err.Error())
+// 	}
+
+// 	err = store.Extend("mykey", 100, SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatal("Extend failed: " + err.Error())
+// 	}
+
+// 	settingExtended, err := store.FindByKey("mykey", SettingOptions{})
+
+// 	if err != nil {
+// 		t.Fatal("Extend failed: " + err.Error())
+// 	}
+
+// 	if settingExtended == nil {
+// 		t.Fatal("Extend failed. Setting is NIL")
+// 	}
+
+// 	if settingExtended.GetValue() != "test" {
+// 		t.Fatal("Extend failed. Value is wrong", settingExtended.GetValue())
+// 	}
+
+// 	diff := settingExtended.GetExpiresAtCarbon().DiffAbsInSeconds(carbon.Now(carbon.UTC))
+
+// 	if diff < 90 {
+// 		t.Fatal("Extend failed. ExpiresAt must be more than 90 seconds", settingExtended.GetExpiresAt(), diff)
+// 	}
+
+// 	if diff > 110 {
+// 		t.Fatal("Extend failed. ExpiresAt must be less than 110 seconds", settingExtended.GetExpiresAt(), diff)
+// 	}
+
+// }
+
+func TestStore_SettingCreate(t *testing.T) {
+	store, err := initStore(":memory:")
+
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
+
+	setting := NewSetting().
+		SetKey("1").
+		SetValue("one two three")
+
+	if setting == nil {
+		t.Fatal("unexpected nil setting")
+	}
+
+	if setting.GetID() == "" {
+		t.Fatal("unexpected empty id:", setting.GetID())
+	}
+
+	if len(setting.GetID()) != 32 {
+		t.Fatal("unexpected id length:", len(setting.GetID()))
+	}
+
+	if setting.GetKey() == "" {
+		t.Fatal("unexpected empty key:", setting.GetKey())
+	}
+
+	if len(setting.GetKey()) != 1 {
+		t.Fatal("unexpected key length:", len(setting.GetKey()))
+	}
+
+	err = store.SettingCreate(setting)
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
 }
 
-func Test_Store_SetJSON(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
+func TestStore_SettingDelete(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	// key := "1234z"
-	// val := `{"a" : "b", "c" : "d"}`
-	// ok, _ := s.SetJSON(key, val)
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
 
-	// if !ok {
-	// 	t.Fatalf("Failure: Set")
-	// }
+	setting := NewSetting().
+		SetKey("1").
+		SetValue("one two three")
+
+	err = store.SettingCreate(setting)
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	err = store.SettingDeleteByID(setting.GetID())
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	settingFindWithDeleted, err := store.SettingList(SettingQuery().
+		SetID(setting.GetID()).
+		SetLimit(1).
+		SetSoftDeletedIncluded(true))
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if len(settingFindWithDeleted) != 0 {
+		t.Fatal("Setting MUST be deleted, but it is not")
+	}
 }
 
-func Test_Store_Remove(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("settings_test_autoremove"), WithAutoMigrate(true))
+func TestStore_SettingDeleteByID(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	// key := "1234z"
-	// val := "123zx"
-	// ok, _ := s.Set(key, val)
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
 
-	// if !ok {
-	// 	t.Fatalf("Failure: Set")
-	// }
+	setting := NewSetting().
+		SetKey("1").
+		SetValue("one two three")
 
-	// s.Remove(key)
-	// ret, err := s.Get(key, "default")
-	// if err != nil {
-	// 	t.Fatalf("No errors are expected but %s", err.Error())
-	// }
-	// if ret != "default" {
-	// 	t.Fatalf("Unable to delete!!! Entry Persists")
-	// }
+	if setting == nil {
+		t.Fatal("unexpected nil setting")
+	}
+
+	if setting.GetID() == "" {
+		t.Fatal("unexpected empty id:", setting.GetID())
+	}
+
+	err = store.SettingCreate(setting)
+
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	err = store.SettingDeleteByID(setting.GetID())
+
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	settingFindWithDeleted, err := store.SettingList(SettingQuery().
+		SetID(setting.GetID()).
+		SetLimit(1).
+		SetSoftDeletedIncluded(true))
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if len(settingFindWithDeleted) != 0 {
+		t.Fatal("Setting MUST be deleted, but it is not")
+	}
 }
 
-func Test_Store_Get(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
+func TestStore_SettingFindByID(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	// key := "1234z"
-	// val := "123zx"
-	// ok, _ := s.Set(key, val)
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
 
-	// if !ok {
-	// 	t.Fatalf("Failure: Set")
-	// }
+	setting := NewSetting().
+		SetKey("1").
+		SetValue("one two three four")
 
-	// ret, err := s.Get(key, "default")
+	if setting == nil {
+		t.Fatal("unexpected nil setting")
+	}
 
-	// if err != nil {
-	// 	t.Fatalf("No errors are expected but %s", err.Error())
-	// }
+	if setting.GetID() == "" {
+		t.Fatal("unexpected empty id:", setting.GetID())
+	}
 
-	// if ret != val {
-	// 	t.Fatalf("Unable to Get: Expected [%v] Received [%v]", val, ret)
-	// }
+	err = store.SettingCreate(setting)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	settingFound, errFind := store.SettingFindByID(setting.GetID())
+
+	if errFind != nil {
+		t.Fatal("unexpected error:", errFind)
+	}
+
+	if settingFound == nil {
+		t.Fatal("Setting MUST NOT be nil")
+	}
+
+	if settingFound.GetID() != setting.GetID() {
+		t.Fatal("IDs do not match")
+	}
+
+	if settingFound.GetValue() != setting.GetValue() {
+		t.Fatal("Values do not match")
+	}
+
+	if settingFound.GetValue() != "one two three four" {
+		t.Fatal("Values do not match, expected: one two three four, got: ", settingFound.GetValue())
+	}
 }
 
-func Test_Store_FindByKey(t *testing.T) {
-	db := InitDB("test_settingsTableName.db")
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("log_with_automigrate"), WithAutoMigrate(true))
+func TestStore_SettingFindByKey(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	// key := "1234z"
-	// val := "123zx"
-	// ok, _ := s.Set(key, val)
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
 
-	// if !ok {
-	// 	t.Fatalf("Failure: Set")
-	// }
+	setting := NewSetting().
+		SetKey("1").
+		SetValue("one two three four")
 
-	// meta, err := s.FindByKey(key)
-	// if err != nil {
-	// 	t.Fatalf("No errors are expected but %s", err.Error())
-	// }
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
 
-	// if meta == nil {
-	// 	t.Fatalf("NIL Record Received")
-	// }
+	if setting == nil {
+		t.Fatal("unexpected nil setting")
+	}
+
+	if setting.GetKey() == "" {
+		t.Fatal("unexpected empty key:", setting.GetKey())
+	}
+
+	err = store.SettingCreate(setting)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	settingFound, errFind := store.SettingFindByKey(setting.GetKey())
+
+	if errFind != nil {
+		t.Fatal("unexpected error:", errFind)
+	}
+
+	if settingFound == nil {
+		t.Fatal("Setting MUST NOT be nil")
+	}
+
+	if settingFound.GetID() != setting.GetID() {
+		t.Fatal("IDs do not match")
+	}
+
+	if settingFound.GetValue() != setting.GetValue() {
+		t.Fatal("Values do not match")
+	}
+
+	if settingFound.GetValue() != "one two three four" {
+		t.Fatal("Values do not match, expected: one two three four, got: ", settingFound.GetValue())
+	}
 }
 
-func Test_Store_GetJSON(t *testing.T) {
-	db := InitDB("test_GetJSON.db")
-	s := NewStore(WithDb(db, "sqlite3"), WithTableName("setting_get_json"), WithAutoMigrate(true))
+func TestStore_SettingList(t *testing.T) {
+	store, err := initStore(":memory:")
 
-	// key := "1234z"
-	// val := `{"a" : "b", "c" : "d"}`
-	// ok, _ := s.SetJSON(key, val)
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
 
-	// if !ok {
-	// 	t.Fatalf("Failure: Set")
-	// }
+	setting1 := NewSetting().
+		SetKey("1").
+		SetValue("one two three")
 
-	// ret, err := s.GetJSON(key, nil)
+	setting2 := NewSetting().
+		SetKey("2").
+		SetValue("four five six")
 
-	// if err != nil {
-	// 	t.Fatalf("No errors are expected but error thrown: %s", err.Error())
-	// }
+	setting3 := NewSetting().
+		SetKey("3").
+		SetValue("seven eight nine")
 
-	// if ret == nil {
-	// 	t.Fatalf("Failure getting JSON value")
-	// }
+	for _, setting := range []SettingInterface{setting1, setting2, setting3} {
+		err = store.SettingCreate(setting)
+		if err != nil {
+			t.Error("unexpected error:", err)
+		}
+	}
 
-	// if ret != val {
-	// 	t.Fatalf("Retrieved value not the same as set value")
-	// }
+	settingList, errList := store.SettingList(SettingQuery().
+		SetKey("2").
+		SetLimit(2))
+
+	if errList != nil {
+		t.Fatal("unexpected error:", errList)
+	}
+
+	if len(settingList) != 1 {
+		t.Fatal("unexpected setting list length:", len(settingList))
+	}
+}
+
+func TestStore_SettingSoftDelete(t *testing.T) {
+	store, err := initStore(":memory:")
+
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
+
+	setting := NewSetting().SetKey("1").SetValue("one two three")
+
+	err = store.SettingCreate(setting)
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	err = store.SettingSoftDeleteByID(setting.GetID())
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if setting.GetSoftDeletedAt() != sb.MAX_DATETIME {
+		t.Fatal("Setting MUST NOT be soft deleted")
+	}
+
+	settingFound, errFind := store.SettingFindByID(setting.GetID())
+
+	if errFind != nil {
+		t.Fatal("unexpected error:", errFind)
+	}
+
+	if settingFound != nil {
+		t.Fatal("Setting MUST be nil")
+	}
+
+	settingFindWithSoftDeleted, err := store.SettingList(SettingQuery().
+		SetID(setting.GetID()).
+		SetSoftDeletedIncluded(true).
+		SetLimit(1))
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if len(settingFindWithSoftDeleted) == 0 {
+		t.Fatal("Exam MUST be soft deleted")
+	}
+
+	if strings.Contains(settingFindWithSoftDeleted[0].GetSoftDeletedAt(), sb.MAX_DATETIME) {
+		t.Fatal("Setting MUST be soft deleted", setting.GetSoftDeletedAt())
+	}
+
+	if !settingFindWithSoftDeleted[0].IsSoftDeleted() {
+		t.Fatal("Setting MUST be soft deleted")
+	}
+}
+
+func TestStore_SettingUpdate(t *testing.T) {
+	store, err := initStore(":memory:")
+
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
+
+	setting := NewSetting().SetKey("1").SetValue("one two three")
+
+	err = store.SettingCreate(setting)
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	setting.SetValue("one two three")
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	err = store.SettingUpdate(setting)
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	settingFound, errFind := store.SettingFindByID(setting.GetID())
+
+	if errFind != nil {
+		t.Fatal("unexpected error:", errFind)
+	}
+
+	if settingFound == nil {
+		t.Fatal("Setting MUST NOT be nil")
+	}
+
+	if settingFound.GetValue() != "one two three" {
+		t.Fatal("Value MUST be 'one two three', found: ", settingFound.GetValue())
+	}
 }

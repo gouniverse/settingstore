@@ -18,14 +18,6 @@ type SettingQueryInterface interface {
 	CreatedAtLte() string
 	SetCreatedAtLte(createdAtLte string) SettingQueryInterface
 
-	HasExpiresAtGte() bool
-	ExpiresAtGte() string
-	SetExpiresAtGte(expiresAtGte string) SettingQueryInterface
-
-	HasExpiresAtLte() bool
-	ExpiresAtLte() string
-	SetExpiresAtLte(expiresAtLte string) SettingQueryInterface
-
 	HasID() bool
 	ID() string
 	SetID(id string) SettingQueryInterface
@@ -37,18 +29,6 @@ type SettingQueryInterface interface {
 	HasKey() bool
 	Key() string
 	SetKey(key string) SettingQueryInterface
-
-	HasUserID() bool
-	UserID() string
-	SetUserID(userID string) SettingQueryInterface
-
-	HasUserIpAddress() bool
-	UserIpAddress() string
-	SetUserIpAddress(userIpAddress string) SettingQueryInterface
-
-	HasUserAgent() bool
-	UserAgent() string
-	SetUserAgent(userAgent string) SettingQueryInterface
 
 	HasOffset() bool
 	Offset() int
@@ -107,6 +87,10 @@ func (q *settingQuery) Validate() error {
 
 	if q.HasIDIn() && len(q.IDIn()) < 1 {
 		return errors.New("Setting query. id_in cannot be empty array")
+	}
+
+	if q.HasKey() && q.Key() == "" {
+		return errors.New("Setting query. key cannot be empty")
 	}
 
 	if q.HasLimit() && q.Limit() < 0 {
@@ -169,32 +153,6 @@ func (q *settingQuery) CreatedAtLte() string {
 
 func (q *settingQuery) SetCreatedAtLte(createdAtLte string) SettingQueryInterface {
 	q.properties["created_at_lte"] = createdAtLte
-	return q
-}
-
-func (q *settingQuery) HasExpiresAtGte() bool {
-	return q.hasProperty("expires_at_gte")
-}
-
-func (q *settingQuery) ExpiresAtGte() string {
-	return q.properties["expires_at_gte"].(string)
-}
-
-func (q *settingQuery) SetExpiresAtGte(expiresAtGte string) SettingQueryInterface {
-	q.properties["expires_at_gte"] = expiresAtGte
-	return q
-}
-
-func (q *settingQuery) HasExpiresAtLte() bool {
-	return q.hasProperty("expires_at_lte")
-}
-
-func (q *settingQuery) ExpiresAtLte() string {
-	return q.properties["expires_at_lte"].(string)
-}
-
-func (q *settingQuery) SetExpiresAtLte(expiresAtLte string) SettingQueryInterface {
-	q.properties["expires_at_lte"] = expiresAtLte
 	return q
 }
 
@@ -303,45 +261,6 @@ func (q *settingQuery) SortOrder() string {
 
 func (q *settingQuery) SetSortOrder(sortOrder string) SettingQueryInterface {
 	q.properties["sort_order"] = sortOrder
-	return q
-}
-
-func (q *settingQuery) HasUserAgent() bool {
-	return q.hasProperty("user_agent")
-}
-
-func (q *settingQuery) UserAgent() string {
-	return q.properties["user_agent"].(string)
-}
-
-func (q *settingQuery) SetUserAgent(userAgent string) SettingQueryInterface {
-	q.properties["user_agent"] = userAgent
-	return q
-}
-
-func (q *settingQuery) HasUserID() bool {
-	return q.hasProperty("user_id")
-}
-
-func (q *settingQuery) UserID() string {
-	return q.properties["user_id"].(string)
-}
-
-func (q *settingQuery) SetUserID(userID string) SettingQueryInterface {
-	q.properties["user_id"] = userID
-	return q
-}
-
-func (q *settingQuery) HasUserIpAddress() bool {
-	return q.hasProperty("user_ip_address")
-}
-
-func (q *settingQuery) UserIpAddress() string {
-	return q.properties["user_ip_address"].(string)
-}
-
-func (q *settingQuery) SetUserIpAddress(userIpAddress string) SettingQueryInterface {
-	q.properties["user_ip_address"] = userIpAddress
 	return q
 }
 
