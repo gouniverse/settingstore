@@ -1,6 +1,7 @@
 package settingstore
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"os"
@@ -74,7 +75,7 @@ func TestStore_Automigrate(t *testing.T) {
 		t.Fatal("Store could not be created: ", err.Error())
 	}
 
-	err = store.AutoMigrate()
+	err = store.AutoMigrate(context.Background())
 
 	if err != nil {
 		t.Fatal("Automigrate failed: " + err.Error())
@@ -90,7 +91,7 @@ func TestStore_EnableDebug(t *testing.T) {
 
 	store.EnableDebug(true)
 
-	err = store.AutoMigrate()
+	err = store.AutoMigrate(context.Background())
 
 	if err != nil {
 		t.Fatal("Automigrate failed: " + err.Error())
@@ -266,7 +267,7 @@ func TestStore_SettingCreate(t *testing.T) {
 		t.Fatal("unexpected key length:", len(setting.GetKey()))
 	}
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
@@ -284,19 +285,19 @@ func TestStore_SettingDelete(t *testing.T) {
 		SetKey("1").
 		SetValue("one two three")
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
-	err = store.SettingDeleteByID(setting.GetID())
+	err = store.SettingDeleteByID(context.Background(), setting.GetID())
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
-	settingFindWithDeleted, err := store.SettingList(SettingQuery().
+	settingFindWithDeleted, err := store.SettingList(context.Background(), SettingQuery().
 		SetID(setting.GetID()).
 		SetLimit(1).
 		SetSoftDeletedIncluded(true))
@@ -329,19 +330,19 @@ func TestStore_SettingDeleteByID(t *testing.T) {
 		t.Fatal("unexpected empty id:", setting.GetID())
 	}
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	err = store.SettingDeleteByID(setting.GetID())
+	err = store.SettingDeleteByID(context.Background(), setting.GetID())
 
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	settingFindWithDeleted, err := store.SettingList(SettingQuery().
+	settingFindWithDeleted, err := store.SettingList(context.Background(), SettingQuery().
 		SetID(setting.GetID()).
 		SetLimit(1).
 		SetSoftDeletedIncluded(true))
@@ -374,12 +375,12 @@ func TestStore_SettingFindByID(t *testing.T) {
 		t.Fatal("unexpected empty id:", setting.GetID())
 	}
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	settingFound, errFind := store.SettingFindByID(setting.GetID())
+	settingFound, errFind := store.SettingFindByID(context.Background(), setting.GetID())
 
 	if errFind != nil {
 		t.Fatal("unexpected error:", errFind)
@@ -425,12 +426,12 @@ func TestStore_SettingFindByKey(t *testing.T) {
 		t.Fatal("unexpected empty key:", setting.GetKey())
 	}
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	settingFound, errFind := store.SettingFindByKey(setting.GetKey())
+	settingFound, errFind := store.SettingFindByKey(context.Background(), setting.GetKey())
 
 	if errFind != nil {
 		t.Fatal("unexpected error:", errFind)
@@ -473,13 +474,13 @@ func TestStore_SettingList(t *testing.T) {
 		SetValue("seven eight nine")
 
 	for _, setting := range []SettingInterface{setting1, setting2, setting3} {
-		err = store.SettingCreate(setting)
+		err = store.SettingCreate(context.Background(), setting)
 		if err != nil {
 			t.Error("unexpected error:", err)
 		}
 	}
 
-	settingList, errList := store.SettingList(SettingQuery().
+	settingList, errList := store.SettingList(context.Background(), SettingQuery().
 		SetKey("2").
 		SetLimit(2))
 
@@ -501,23 +502,23 @@ func TestStore_SettingSoftDelete(t *testing.T) {
 
 	setting := NewSetting().SetKey("1").SetValue("one two three")
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
-	err = store.SettingSoftDeleteByID(setting.GetID())
+	err = store.SettingSoftDeleteByID(context.Background(), setting.GetID())
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
 	if setting.GetSoftDeletedAt() != sb.MAX_DATETIME {
-		t.Fatal("Setting MUST NOT be soft deleted")
+		t.Fatal("Setting MUST be soft deleted")
 	}
 
-	settingFound, errFind := store.SettingFindByID(setting.GetID())
+	settingFound, errFind := store.SettingFindByID(context.Background(), setting.GetID())
 
 	if errFind != nil {
 		t.Fatal("unexpected error:", errFind)
@@ -527,7 +528,7 @@ func TestStore_SettingSoftDelete(t *testing.T) {
 		t.Fatal("Setting MUST be nil")
 	}
 
-	settingFindWithSoftDeleted, err := store.SettingList(SettingQuery().
+	settingFindWithSoftDeleted, err := store.SettingList(context.Background(), SettingQuery().
 		SetID(setting.GetID()).
 		SetSoftDeletedIncluded(true).
 		SetLimit(1))
@@ -541,7 +542,7 @@ func TestStore_SettingSoftDelete(t *testing.T) {
 	}
 
 	if strings.Contains(settingFindWithSoftDeleted[0].GetSoftDeletedAt(), sb.MAX_DATETIME) {
-		t.Fatal("Setting MUST be soft deleted", setting.GetSoftDeletedAt())
+		t.Fatalf("Setting MUST be soft deleted, but got: %s", settingFindWithSoftDeleted[0].GetSoftDeletedAt())
 	}
 
 	if !settingFindWithSoftDeleted[0].IsSoftDeleted() {
@@ -558,7 +559,7 @@ func TestStore_SettingUpdate(t *testing.T) {
 
 	setting := NewSetting().SetKey("1").SetValue("one two three")
 
-	err = store.SettingCreate(setting)
+	err = store.SettingCreate(context.Background(), setting)
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
@@ -570,13 +571,13 @@ func TestStore_SettingUpdate(t *testing.T) {
 		t.Fatal("unexpected error:", err)
 	}
 
-	err = store.SettingUpdate(setting)
+	err = store.SettingUpdate(context.Background(), setting)
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
-	settingFound, errFind := store.SettingFindByID(setting.GetID())
+	settingFound, errFind := store.SettingFindByID(context.Background(), setting.GetID())
 
 	if errFind != nil {
 		t.Fatal("unexpected error:", errFind)

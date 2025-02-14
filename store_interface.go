@@ -1,17 +1,21 @@
 package settingstore
 
+import (
+	"context"
+)
+
 type StoreInterface interface {
-	AutoMigrate() error
+	AutoMigrate(ctx context.Context) error
 	EnableDebug(debug bool)
 
-	SettingCount(query SettingQueryInterface) (int64, error)
-	SettingCreate(setting SettingInterface) error
-	SettingDelete(setting SettingInterface) error
-	SettingDeleteByID(settingID string) error
-	SettingFindByID(settingID string) (SettingInterface, error)
-	SettingFindByKey(settingKey string) (SettingInterface, error)
-	SettingList(query SettingQueryInterface) ([]SettingInterface, error)
-	SettingSoftDelete(setting SettingInterface) error
-	SettingSoftDeleteByID(settingID string) error
-	SettingUpdate(setting SettingInterface) error
+	SettingCount(ctx context.Context, query SettingQueryInterface) (int64, error)
+	SettingCreate(ctx context.Context, setting SettingInterface) error
+	SettingDelete(ctx context.Context, setting SettingInterface) error
+	SettingDeleteByID(ctx context.Context, settingID string) error
+	SettingFindByID(ctx context.Context, settingID string) (SettingInterface, error)
+	SettingFindByKey(ctx context.Context, settingKey string) (SettingInterface, error)
+	SettingList(ctx context.Context, query SettingQueryInterface) ([]SettingInterface, error)
+	SettingSoftDelete(ctx context.Context, setting SettingInterface) error
+	SettingSoftDeleteByID(ctx context.Context, settingID string) error
+	SettingUpdate(ctx context.Context, setting SettingInterface) error
 }

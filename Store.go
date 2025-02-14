@@ -1,6 +1,7 @@
 package settingstore
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -40,7 +41,7 @@ type store struct {
 // PUBLIC METHODS ============================================================
 
 // AutoMigrate auto migrate
-func (store *store) AutoMigrate() error {
+func (store *store) AutoMigrate(ctx context.Context) error {
 	sqlStr := store.SQLCreateTable()
 
 	if sqlStr == "" {
@@ -66,7 +67,7 @@ func (st *store) EnableDebug(debug bool) {
 }
 
 // Delete deletes a setting
-func (st *store) Delete(settingKey string) error {
+func (st *store) Delete(ctx context.Context, settingKey string) error {
 	wheres := []goqu.Expression{
 		goqu.C(COLUMN_SETTING_KEY).Eq(settingKey),
 	}
@@ -103,7 +104,7 @@ func (st *store) Delete(settingKey string) error {
 }
 
 // FindByKey finds a setting by key
-func (store *store) FindByKey(settingKey string) (SettingInterface, error) {
+func (store *store) FindByKey(ctx context.Context, settingKey string) (SettingInterface, error) {
 	if settingKey == "" {
 		return nil, errors.New("setting store > find by key: setting key is required")
 	}
@@ -112,7 +113,7 @@ func (store *store) FindByKey(settingKey string) (SettingInterface, error) {
 		SetKey(settingKey).
 		SetLimit(1)
 
-	list, err := store.SettingList(query)
+	list, err := store.SettingList(ctx, query)
 
 	if err != nil {
 		return nil, err
@@ -126,8 +127,8 @@ func (store *store) FindByKey(settingKey string) (SettingInterface, error) {
 }
 
 // Gets the setting value as a string
-func (st *store) Get(settingKey string, valueDefault string) (string, error) {
-	setting, errFindByKey := st.FindByKey(settingKey)
+func (st *store) Get(ctx context.Context, settingKey string, valueDefault string) (string, error) {
+	setting, errFindByKey := st.FindByKey(ctx, settingKey)
 
 	if errFindByKey != nil {
 		return "", errFindByKey
@@ -141,8 +142,8 @@ func (st *store) Get(settingKey string, valueDefault string) (string, error) {
 }
 
 // GetAny attempts to parse the value as interface, use with SetAny
-func (st *store) GetAny(key string, valueDefault interface{}) (interface{}, error) {
-	setting, errFindByKey := st.FindByKey(key)
+func (st *store) GetAny(ctx context.Context, key string, valueDefault interface{}) (interface{}, error) {
+	setting, errFindByKey := st.FindByKey(ctx, key)
 
 	if errFindByKey != nil {
 		return valueDefault, errFindByKey
@@ -163,8 +164,8 @@ func (st *store) GetAny(key string, valueDefault interface{}) (interface{}, erro
 }
 
 // GetMap attempts to parse the value as map[string]any, use with SetMap
-func (st *store) GetMap(key string, valueDefault map[string]any) (map[string]any, error) {
-	setting, errFindByKey := st.FindByKey(key)
+func (st *store) GetMap(ctx context.Context, key string, valueDefault map[string]any) (map[string]any, error) {
+	setting, errFindByKey := st.FindByKey(ctx, key)
 
 	if errFindByKey != nil {
 		return valueDefault, errFindByKey
@@ -185,7 +186,7 @@ func (st *store) GetMap(key string, valueDefault map[string]any) (map[string]any
 }
 
 // Has finds if a setting by key exists
-func (store *store) Has(settingKey string) (bool, error) {
+func (store *store) Has(ctx context.Context, settingKey string) (bool, error) {
 	if settingKey == "" {
 		return false, errors.New("setting store > find by key: setting key is required")
 	}
@@ -194,7 +195,7 @@ func (store *store) Has(settingKey string) (bool, error) {
 		SetKey(settingKey).
 		SetLimit(1)
 
-	count, err := store.SettingCount(query)
+	count, err := store.SettingCount(ctx, query)
 
 	if err != nil {
 		return false, err
@@ -203,8 +204,8 @@ func (store *store) Has(settingKey string) (bool, error) {
 	return count > 0, nil
 }
 
-func (st *store) MergeMap(key string, mergeMap map[string]any, seconds int64) error {
-	currentMap, err := st.GetMap(key, nil)
+func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64) error {
+	currentMap, err := st.GetMap(ctx, key, nil)
 
 	if err != nil {
 		return err
@@ -218,13 +219,13 @@ func (st *store) MergeMap(key string, mergeMap map[string]any, seconds int64) er
 		currentMap[mapKey] = mapValue
 	}
 
-	return st.SetMap(key, currentMap, seconds)
+	return st.SetMap(ctx, key, currentMap, seconds)
 }
 
-func (store *store) SettingCount(options SettingQueryInterface) (int64, error) {
+func (store *store) SettingCount(ctx context.Context, options SettingQueryInterface) (int64, error) {
 	options.SetCountOnly(true)
 
-	q, _, err := store.settingSelectQuery(options)
+	q, _, err := store.settingSelectQuery(ctx, options)
 
 	if err != nil {
 		return -1, err
@@ -265,7 +266,7 @@ func (store *store) SettingCount(options SettingQueryInterface) (int64, error) {
 	return i, nil
 }
 
-func (st *store) SettingCreate(setting SettingInterface) error {
+func (st *store) SettingCreate(ctx context.Context, setting SettingInterface) error {
 	if setting == nil {
 		return errors.New("settingstore > setting create. setting cannot be nil")
 	}
@@ -312,16 +313,16 @@ func (st *store) SettingCreate(setting SettingInterface) error {
 }
 
 // SettingDelete deletes a setting
-func (store *store) SettingDelete(setting SettingInterface) error {
+func (store *store) SettingDelete(ctx context.Context, setting SettingInterface) error {
 	if setting == nil {
 		return errors.New("setting is nil")
 	}
 
-	return store.SettingDeleteByID(setting.GetID())
+	return store.SettingDeleteByID(ctx, setting.GetID())
 }
 
 // SettingDeleteByID deletes a setting by id
-func (store *store) SettingDeleteByID(id string) error {
+func (store *store) SettingDeleteByID(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("setting id is empty")
 	}
@@ -344,7 +345,7 @@ func (store *store) SettingDeleteByID(id string) error {
 }
 
 // SettingDeleteByID deletes a setting by id
-func (store *store) SettingDeleteByKey(settingKey string) error {
+func (store *store) SettingDeleteByKey(ctx context.Context, settingKey string) error {
 	if settingKey == "" {
 		return errors.New("setting id is empty")
 	}
@@ -367,7 +368,7 @@ func (store *store) SettingDeleteByKey(settingKey string) error {
 }
 
 // SettingFindByID finds a setting by id
-func (store *store) SettingFindByID(settingID string) (SettingInterface, error) {
+func (store *store) SettingFindByID(ctx context.Context, settingID string) (SettingInterface, error) {
 	if settingID == "" {
 		return nil, errors.New("setting store > find by id: setting id is required")
 	}
@@ -376,7 +377,7 @@ func (store *store) SettingFindByID(settingID string) (SettingInterface, error) 
 		SetID(settingID).
 		SetLimit(1)
 
-	list, err := store.SettingList(query)
+	list, err := store.SettingList(ctx, query)
 
 	if err != nil {
 		return nil, err
@@ -390,7 +391,7 @@ func (store *store) SettingFindByID(settingID string) (SettingInterface, error) 
 }
 
 // SettingFindByKey finds a setting by key
-func (store *store) SettingFindByKey(settingKey string) (SettingInterface, error) {
+func (store *store) SettingFindByKey(ctx context.Context, settingKey string) (SettingInterface, error) {
 	if settingKey == "" {
 		return nil, errors.New("setting store > find by key: setting key is required")
 	}
@@ -399,7 +400,7 @@ func (store *store) SettingFindByKey(settingKey string) (SettingInterface, error
 		SetKey(settingKey).
 		SetLimit(1)
 
-	list, err := store.SettingList(query)
+	list, err := store.SettingList(ctx, query)
 
 	if err != nil {
 		return nil, err
@@ -412,7 +413,7 @@ func (store *store) SettingFindByKey(settingKey string) (SettingInterface, error
 	return nil, nil
 }
 
-func (store *store) SettingList(query SettingQueryInterface) ([]SettingInterface, error) {
+func (store *store) SettingList(ctx context.Context, query SettingQueryInterface) ([]SettingInterface, error) {
 	if query == nil {
 		return []SettingInterface{}, errors.New("at setting list > setting query is nil")
 	}
@@ -421,7 +422,7 @@ func (store *store) SettingList(query SettingQueryInterface) ([]SettingInterface
 		return []SettingInterface{}, err
 	}
 
-	q, columns, err := store.settingSelectQuery(query)
+	q, columns, err := store.settingSelectQuery(ctx, query)
 
 	if err != nil {
 		return []SettingInterface{}, err
@@ -461,27 +462,27 @@ func (store *store) SettingList(query SettingQueryInterface) ([]SettingInterface
 	return list, nil
 }
 
-func (store *store) SettingSoftDelete(setting SettingInterface) error {
+func (store *store) SettingSoftDelete(ctx context.Context, setting SettingInterface) error {
 	if setting == nil {
 		return errors.New("setting is nil")
 	}
 
 	setting.SetSoftDeletedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-	return store.SettingUpdate(setting)
+	return store.SettingUpdate(ctx, setting)
 }
 
-func (store *store) SettingSoftDeleteByID(id string) error {
-	setting, err := store.SettingFindByID(id)
+func (store *store) SettingSoftDeleteByID(ctx context.Context, id string) error {
+	setting, err := store.SettingFindByID(ctx, id)
 
 	if err != nil {
 		return err
 	}
 
-	return store.SettingSoftDelete(setting)
+	return store.SettingSoftDelete(ctx, setting)
 }
 
-func (store *store) SettingUpdate(setting SettingInterface) error {
+func (store *store) SettingUpdate(ctx context.Context, setting SettingInterface) error {
 	if setting == nil {
 		return errors.New("settingstore > setting update. setting cannot be nil")
 	}
@@ -542,8 +543,8 @@ func (store *store) SettingUpdate(setting SettingInterface) error {
 }
 
 // Set sets a key in store
-func (st *store) Set(settingKey string, value string, seconds int64) error {
-	setting, errFindByKey := st.FindByKey(settingKey)
+func (st *store) Set(ctx context.Context, settingKey string, value string, seconds int64) error {
+	setting, errFindByKey := st.FindByKey(ctx, settingKey)
 
 	if errFindByKey != nil {
 		return errFindByKey
@@ -554,37 +555,37 @@ func (st *store) Set(settingKey string, value string, seconds int64) error {
 			SetKey(settingKey).
 			SetValue(value)
 
-		return st.SettingCreate(newSetting)
+		return st.SettingCreate(ctx, newSetting)
 	} else {
 		setting.SetValue(value)
 		setting.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-		return st.SettingUpdate(setting)
+		return st.SettingUpdate(ctx, setting)
 	}
 }
 
 // SetAny convenience method which saves the supplied interface value, use GetAny to extract
 // Internally it serializes the data to JSON
-func (st *store) SetAny(key string, value interface{}, seconds int64) error {
+func (st *store) SetAny(ctx context.Context, key string, value interface{}, seconds int64) error {
 	jsonValue, jsonError := json.Marshal(value)
 	if jsonError != nil {
 		return jsonError
 	}
 
-	return st.Set(key, string(jsonValue), seconds)
+	return st.Set(ctx, key, string(jsonValue), seconds)
 }
 
 // SetMap convenience method which saves the supplied map, use GetMap to extract
-func (st *store) SetMap(key string, value map[string]any, seconds int64) error {
+func (st *store) SetMap(ctx context.Context, key string, value map[string]any, seconds int64) error {
 	jsonValue, jsonError := json.Marshal(value)
 	if jsonError != nil {
 		return jsonError
 	}
 
-	return st.Set(key, string(jsonValue), seconds)
+	return st.Set(ctx, key, string(jsonValue), seconds)
 }
 
-func (store *store) settingSelectQuery(options SettingQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
+func (store *store) settingSelectQuery(ctx context.Context, options SettingQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
 	if options == nil {
 		return nil, []any{}, errors.New("setting query: cannot be nil")
 	}
