@@ -17,6 +17,7 @@ import (
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlserver" // importing sqlserver dialect
 	"github.com/dromara/carbon/v2"
 	"github.com/georgysavva/scany/sqlscan"
+	"github.com/gouniverse/base/database"
 	"github.com/gouniverse/sb"
 	"github.com/samber/lo"
 )
@@ -52,7 +53,7 @@ func (store *store) AutoMigrate(ctx context.Context) error {
 		return errors.New("setting store: database is nil")
 	}
 
-	_, err := store.db.Exec(sqlStr)
+	_, err := database.Execute(database.Context(ctx, store.db), sqlStr)
 
 	if err != nil {
 		return err

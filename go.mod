@@ -5,6 +5,7 @@ go 1.23.3
 require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/georgysavva/scany v1.2.2
+	github.com/gouniverse/base v0.0.7
 	github.com/gouniverse/uid v1.5.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/samber/lo v1.47.0
@@ -13,7 +14,6 @@ require (
 require (
 	github.com/darkoatanasovski/htmltags v1.0.0 // indirect
 	github.com/gouniverse/api v1.6.0 // indirect
-	github.com/gouniverse/base v0.0.7 // indirect
 	github.com/gouniverse/cdn v1.5.0 // indirect
 	github.com/gouniverse/crypto v0.2.0 // indirect
 	github.com/gouniverse/envenc v0.8.0 // indirect
