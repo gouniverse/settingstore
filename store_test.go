@@ -9,12 +9,11 @@ import (
 	"testing"
 
 	"github.com/gouniverse/sb"
-	"github.com/gouniverse/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func initDB(filepath string) (*sql.DB, error) {
-	if filepath != ":memory:" && utils.FileExists(filepath) {
+	if filepath != ":memory:" && fileExists(filepath) {
 		err := os.Remove(filepath) // remove database
 
 		if err != nil {

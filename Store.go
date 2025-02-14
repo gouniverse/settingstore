@@ -226,7 +226,7 @@ func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]a
 func (store *store) SettingCount(ctx context.Context, options SettingQueryInterface) (int64, error) {
 	options.SetCountOnly(true)
 
-	q, _, err := store.settingSelectQuery(ctx, options)
+	q, _, err := store.settingSelectQuery(options)
 
 	if err != nil {
 		return -1, err
@@ -423,7 +423,7 @@ func (store *store) SettingList(ctx context.Context, query SettingQueryInterface
 		return []SettingInterface{}, err
 	}
 
-	q, columns, err := store.settingSelectQuery(ctx, query)
+	q, columns, err := store.settingSelectQuery(query)
 
 	if err != nil {
 		return []SettingInterface{}, err
@@ -586,7 +586,7 @@ func (st *store) SetMap(ctx context.Context, key string, value map[string]any, s
 	return st.Set(ctx, key, string(jsonValue), seconds)
 }
 
-func (store *store) settingSelectQuery(ctx context.Context, options SettingQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
+func (store *store) settingSelectQuery(options SettingQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
 	if options == nil {
 		return nil, []any{}, errors.New("setting query: cannot be nil")
 	}
