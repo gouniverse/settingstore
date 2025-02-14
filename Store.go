@@ -310,16 +310,3 @@ func (store *store) logSql(sqlOperationType string, sql string, params ...interf
 	// 	store.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sql), slog.Any("params", params))
 	// } // slog is not defined
 }
-
-// SQLCreateTable returns the create table sql
-func (store *store) SQLCreateTable() string {
-	return `
-	CREATE TABLE IF NOT EXISTS ` + store.settingsTableName + ` (
-		id VARCHAR(36) NOT NULL PRIMARY KEY,
-		key VARCHAR(255) NOT NULL,
-		value TEXT NULL,
-		created_at VARCHAR(255) NOT NULL,
-		updated_at VARCHAR(255) NOT NULL
-	);
-	`
-}
