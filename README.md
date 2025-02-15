@@ -102,35 +102,34 @@ These methods may be subject to change as still in development
 ### Store Methods
 
 - NewStore(opts NewStoreOptions) (*store, error) - creates a new setting store
-
-- AutoMigrate() error - auto migrate (create the tables in the database) the settings store tables
+- AutoMigrate(ctx context.Context) error - auto migrate (create the tables in the database) the settings store tables
 - DriverName(db *sql.DB) string - the name of the driver used for SQL strings (you may use this if you need to debug)
 - SqlCreateTable() string - SQL string for creating the tables (you may use this string if you want to set your own migrations)
-- SettingCount(options SettingQueryInterface) (int64, error) - counts the number of settings
-- SettingCreate(setting SettingInterface) error - creates a new setting
-- SettingDelete(setting SettingInterface) error - deletes a setting
-- SettingDeleteByID(id string) error - deletes a setting by ID
-- SettingDeleteByKey(settingKey string) error - deletes a setting by key
-- SettingFindByID(settingID string) (SettingInterface, error) - finds a setting by ID
-- SettingList(query SettingQueryInterface) ([]SettingInterface, error) - lists settings
-- SettingSoftDelete(setting SettingInterface) error - soft deletes a setting
-- SettingSoftDeleteByID(id string) error - soft deletes a setting by ID
-- SettingUpdate(setting SettingInterface) error - updates a setting
+- SettingCount(ctx context.Context, query SettingQueryInterface) (int64, error) - counts the number of settings
+- SettingCreate(ctx context.Context, setting SettingInterface) error - creates a new setting
+- SettingDelete(ctx context.Context, setting SettingInterface) error - deletes a setting
+- SettingDeleteByID(ctx context.Context, settingID string) error - deletes a setting by ID
+- SettingDeleteByKey(ctx context.Context, settingKey string) error - deletes a setting by key
+- SettingFindByID(ctx context.Context, settingID string) (SettingInterface, error) - finds a setting by ID
+- SettingList(ctx context.Context, query SettingQueryInterface) ([]SettingInterface, error) - lists settings
+- SettingSoftDelete(ctx context.Context, setting SettingInterface) error - soft deletes a setting
+- SettingSoftDeleteByID(ctx context.Context, settingID string) error - soft deletes a setting by ID
+- SettingUpdate(ctx context.Context, setting SettingInterface) error - updates a setting
 
 ### Setting Methods
 
-- Delete() bool - deletes the entity
-- FindByKey(key string) (SettingInterface, error) - finds a Setting by key
+- Delete(ctx context.Context) error - deletes the entity
+- FindByKey(ctx context.Context, key string) (SettingInterface, error) - finds a Setting by key
 - GetJSON(key string, valueDefault interface{}) (interface{}, error) - gets a value as JSON from key-value setting pair
 - Keys() ([]string, error) - gets all keys sorted alphabetically (useful if you want to list these in admin panel)
 - Remove(key string) error - removes a setting from store
 
 ### Shortcut Methods
 
-- Get(key string, valueDefault string) (string, error) - gets a value from key-value setting pair
-- Set(key string, value string, seconds int64) error - sets new key value pair
-- SetJSON(key string, value interface{}, seconds int64) error - sets new key JSON value pair
-- GetAny(key string, valueDefault interface{}) (interface{}, error) - gets a value from key-value setting pair
-- GetMap(key string, valueDefault map[string]any) (map[string]any, error) - gets a value as JSON from key-value setting pair
-- Has(settingKey string) (bool, error) - checks if a setting exists
-- MergeMap(key string, mergeMap map[string]any, seconds int64) error - merges a map with an existing map
+- Get(ctx context.Context, key string, valueDefault string) (string, error) - gets a value from key-value setting pair
+- Set(ctx context.Context, key string, value string, seconds int64) error - sets new key value pair
+- SetJSON(ctx context.Context, key string, value interface{}, seconds int64) error - sets new key JSON value pair
+- GetAny(ctx context.Context, key string, valueDefault interface{}) (interface{}, error) - gets a value from key-value setting pair
+- GetMap(ctx context.Context, key string, valueDefault map[string]any) (map[string]any, error) - gets a value as JSON from key-value setting pair
+- Has(ctx context.Context, settingKey string) (bool, error) - checks if a setting exists
+- MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64) error - merges a map with an existing map
