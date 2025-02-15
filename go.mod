@@ -4,7 +4,6 @@ go 1.23.3
 
 require (
 	github.com/doug-martin/goqu/v9 v9.19.0
-	github.com/georgysavva/scany v1.2.2
 	github.com/gouniverse/base v0.8.1
 	github.com/gouniverse/uid v1.5.0
 	github.com/mattn/go-sqlite3 v1.14.24
@@ -12,6 +11,7 @@ require (
 )
 
 require (
+	github.com/georgysavva/scany v1.2.2 // indirect
 	github.com/gouniverse/hb v1.83.4 // indirect
 	github.com/gouniverse/maputils v0.7.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
