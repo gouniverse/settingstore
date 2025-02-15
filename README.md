@@ -100,11 +100,9 @@ if serverIp == "" {
 These methods may be subject to change as still in development
 
 ### Store Methods
-
 - NewStore(opts NewStoreOptions) (*store, error) - creates a new setting store
 - AutoMigrate(ctx context.Context) error - auto migrate (create the tables in the database) the settings store tables
 - DriverName(db *sql.DB) string - the name of the driver used for SQL strings (you may use this if you need to debug)
-- SqlCreateTable() string - SQL string for creating the tables (you may use this string if you want to set your own migrations)
 - SettingCount(ctx context.Context, query SettingQueryInterface) (int64, error) - counts the number of settings
 - SettingCreate(ctx context.Context, setting SettingInterface) error - creates a new setting
 - SettingDelete(ctx context.Context, setting SettingInterface) error - deletes a setting
@@ -116,20 +114,18 @@ These methods may be subject to change as still in development
 - SettingSoftDeleteByID(ctx context.Context, settingID string) error - soft deletes a setting by ID
 - SettingUpdate(ctx context.Context, setting SettingInterface) error - updates a setting
 
-### Setting Methods
-
-- Delete(ctx context.Context) error - deletes the entity
-- FindByKey(ctx context.Context, key string) (SettingInterface, error) - finds a Setting by key
-- GetJSON(key string, valueDefault interface{}) (interface{}, error) - gets a value as JSON from key-value setting pair
-- Keys() ([]string, error) - gets all keys sorted alphabetically (useful if you want to list these in admin panel)
-- Remove(key string) error - removes a setting from store
 
 ### Shortcut Methods
 
 - Get(ctx context.Context, key string, valueDefault string) (string, error) - gets a value from key-value setting pair
 - Set(ctx context.Context, key string, value string, seconds int64) error - sets new key value pair
-- SetJSON(ctx context.Context, key string, value interface{}, seconds int64) error - sets new key JSON value pair
+
 - GetAny(ctx context.Context, key string, valueDefault interface{}) (interface{}, error) - gets a value from key-value setting pair
+
+- GetJSON(key string, valueDefault interface{}) (interface{}, error) - gets a value as JSON from key-value setting pair
+- SetJSON(ctx context.Context, key string, value interface{}, seconds int64) error - sets new key JSON value pair
+
 - GetMap(ctx context.Context, key string, valueDefault map[string]any) (map[string]any, error) - gets a value as JSON from key-value setting pair
-- Has(ctx context.Context, settingKey string) (bool, error) - checks if a setting exists
 - MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64) error - merges a map with an existing map
+
+- Has(ctx context.Context, settingKey string) (bool, error) - checks if a setting exists

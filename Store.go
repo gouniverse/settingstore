@@ -16,7 +16,6 @@ import (
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"   // importing sqlite3 dialect
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlserver" // importing sqlserver dialect
 	"github.com/dromara/carbon/v2"
-	"github.com/georgysavva/scany/sqlscan"
 	"github.com/gouniverse/base/database"
 	"github.com/gouniverse/sb"
 	"github.com/samber/lo"
@@ -41,7 +40,13 @@ type store struct {
 
 // PUBLIC METHODS ============================================================
 
-// AutoMigrate auto migrate
+// AutoMigrate creates the settings table if it does not exist
+//
+// Parameters:
+// - ctx: the context
+//
+// Returns:
+// - error - nil if no error, error otherwise
 func (store *store) AutoMigrate(ctx context.Context) error {
 	sqlStr := store.SQLCreateTable()
 
@@ -63,73 +68,47 @@ func (store *store) AutoMigrate(ctx context.Context) error {
 }
 
 // EnableDebug - enables the debug option
+//
+// # If enabled will log the SQL statements to the provided logger
+//
+// Parameters:
+// - debug: true to enable, false otherwise
+//
+// Returns:
+// - void
 func (st *store) EnableDebug(debug bool) {
 	st.debugEnabled = debug
 }
 
-// Delete deletes a setting
+// Delete is a shortcut method to delete a value by key
+//
+// # It is a convenience method which wraps SettingDeleteByKey
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to delete
+//
+// Returns:
+// - error - nil if no error, error otherwise
 func (st *store) Delete(ctx context.Context, settingKey string) error {
-	wheres := []goqu.Expression{
-		goqu.C(COLUMN_SETTING_KEY).Eq(settingKey),
-	}
-
-	sqlStr, sqlParams, err := goqu.Dialect(st.dbDriverName).
-		From(st.settingTableName).
-		Where(wheres...).
-		Delete().
-		Prepared(true).
-		ToSQL()
-
-	if err != nil {
-		return err
-	}
-
-	st.logSql("delete", sqlStr, sqlParams)
-
-	_, err = st.db.Exec(sqlStr, sqlParams...)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// Looks like this is now outdated for sqlscan
-			return nil
-		}
-
-		if sqlscan.NotFound(err) {
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
+	return st.SettingDeleteByKey(ctx, settingKey)
 }
 
-// FindByKey finds a setting by key
-func (store *store) FindByKey(ctx context.Context, settingKey string) (SettingInterface, error) {
-	if settingKey == "" {
-		return nil, errors.New("setting store > find by key: setting key is required")
-	}
-
-	query := SettingQuery().
-		SetKey(settingKey).
-		SetLimit(1)
-
-	list, err := store.SettingList(ctx, query)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(list) > 0 {
-		return list[0], nil
-	}
-
-	return nil, nil
-}
-
-// Gets the setting value as a string
+// Get is a shortcut method to get a value by key, or a default, if not found
+//
+// It is a convenience method which wraps SettingFindByKey and returns
+// the value directly
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to get
+// - valueDefault: the default value to return if the setting is not found
+//
+// Returns:
+// - string - the value of the setting, or the default value if not found
+// - error - nil if no error, error otherwise
 func (st *store) Get(ctx context.Context, settingKey string, valueDefault string) (string, error) {
-	setting, errFindByKey := st.FindByKey(ctx, settingKey)
+	setting, errFindByKey := st.SettingFindByKey(ctx, settingKey)
 
 	if errFindByKey != nil {
 		return "", errFindByKey
@@ -142,9 +121,20 @@ func (st *store) Get(ctx context.Context, settingKey string, valueDefault string
 	return valueDefault, nil
 }
 
-// GetAny attempts to parse the value as interface, use with SetAny
-func (st *store) GetAny(ctx context.Context, key string, valueDefault interface{}) (interface{}, error) {
-	setting, errFindByKey := st.FindByKey(ctx, key)
+// GetAny is a shortcut method to get a value by key as an interface, or a default if not found
+//
+// It is a convenience method which wraps SettingFindByKey, gets the value
+// directly and attempts to parse the value as interface
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to get
+// - valueDefault: the default value to return if the setting is not found
+//
+// Returns:
+// - interface{}, error
+func (st *store) GetAny(ctx context.Context, key string, valueDefault any) (any, error) {
+	setting, errFindByKey := st.SettingFindByKey(ctx, key)
 
 	if errFindByKey != nil {
 		return valueDefault, errFindByKey
@@ -164,9 +154,21 @@ func (st *store) GetAny(ctx context.Context, key string, valueDefault interface{
 	return valueDefault, nil
 }
 
-// GetMap attempts to parse the value as map[string]any, use with SetMap
+// GetMap is a shortcut method to get a value by key as a map, or a default if not found
+//
+// It is a convenience method which wraps SettingFindByKey, and attempts
+// to parse the value as map[string]any
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to get
+// - valueDefault: the default value to return if the setting is not found
+//
+// Returns:
+// - map[string]any - the value of the setting, or the default value if not found
+// - error - nil if no error, error otherwise
 func (st *store) GetMap(ctx context.Context, key string, valueDefault map[string]any) (map[string]any, error) {
-	setting, errFindByKey := st.FindByKey(ctx, key)
+	setting, errFindByKey := st.SettingFindByKey(ctx, key)
 
 	if errFindByKey != nil {
 		return valueDefault, errFindByKey
@@ -186,7 +188,18 @@ func (st *store) GetMap(ctx context.Context, key string, valueDefault map[string
 	return valueDefault, nil
 }
 
-// Has finds if a setting by key exists
+// Has is a shortcut method to check if a setting exists by key
+//
+// It is a convenience method which wraps SettingCount and returns
+// true if the count is greater than 0
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to check
+//
+// Returns:
+// - bool - true if the setting exists, false otherwise
+// - error - nil if no error, error otherwise
 func (store *store) Has(ctx context.Context, settingKey string) (bool, error) {
 	if settingKey == "" {
 		return false, errors.New("setting store > find by key: setting key is required")
@@ -205,7 +218,19 @@ func (store *store) Has(ctx context.Context, settingKey string) (bool, error) {
 	return count > 0, nil
 }
 
-func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64) error {
+// MergeMap is a shortcut method to merge a map with an existing map
+//
+// It is a convenience method which wraps GetMap and SetMap to merge
+// a map with an existing map
+//
+// Parameters:
+// - ctx: the context
+// - key: the key of the setting to merge
+// - mergeMap: the map to merge with the existing map
+//
+// Returns:
+// - error - nil if no error, error otherwise
+func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]any) error {
 	currentMap, err := st.GetMap(ctx, key, nil)
 
 	if err != nil {
@@ -220,7 +245,7 @@ func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]a
 		currentMap[mapKey] = mapValue
 	}
 
-	return st.SetMap(ctx, key, currentMap, seconds)
+	return st.SetMap(ctx, key, currentMap)
 }
 
 func (store *store) SettingCount(ctx context.Context, options SettingQueryInterface) (int64, error) {
@@ -543,9 +568,20 @@ func (store *store) SettingUpdate(ctx context.Context, setting SettingInterface)
 	return nil
 }
 
-// Set sets a key in store
-func (st *store) Set(ctx context.Context, settingKey string, value string, seconds int64) error {
-	setting, errFindByKey := st.FindByKey(ctx, settingKey)
+// Set is a shortcut method to save a value by key, use Get to extract
+//
+// It is a convenience method which wraps SettingFindByKey,
+// and then SettingCreate or SettingUpdate
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to save
+// - value: the value to save
+//
+// Returns:
+// - error - nil if no error, error otherwise
+func (st *store) Set(ctx context.Context, settingKey string, value string) error {
+	setting, errFindByKey := st.SettingFindByKey(ctx, settingKey)
 
 	if errFindByKey != nil {
 		return errFindByKey
@@ -559,33 +595,63 @@ func (st *store) Set(ctx context.Context, settingKey string, value string, secon
 		return st.SettingCreate(ctx, newSetting)
 	} else {
 		setting.SetValue(value)
-		setting.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
 		return st.SettingUpdate(ctx, setting)
 	}
 }
 
-// SetAny convenience method which saves the supplied interface value, use GetAny to extract
-// Internally it serializes the data to JSON
+// SetAny is a shortcut method to save any value by key, use GetAny to extract
+//
+// It is a convenience method which wraps SettingCreate or SettingUpdate
+// and uses JSON to serialize the data
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to save
+// - value: the value to save
+//
+// Returns:
+// - error - nil if no error, error otherwise
 func (st *store) SetAny(ctx context.Context, key string, value interface{}, seconds int64) error {
 	jsonValue, jsonError := json.Marshal(value)
 	if jsonError != nil {
 		return jsonError
 	}
 
-	return st.Set(ctx, key, string(jsonValue), seconds)
+	return st.Set(ctx, key, string(jsonValue))
 }
 
-// SetMap convenience method which saves the supplied map, use GetMap to extract
-func (st *store) SetMap(ctx context.Context, key string, value map[string]any, seconds int64) error {
+// SetMap is a shortcut method to save a map by key, use GetMap to extract
+//
+// It is a convenience method which wraps SettingCreate or SettingUpdate
+// to save a map by key
+//
+// Parameters:
+// - ctx: the context
+// - settingKey: the key of the setting to save
+// - value: the value to save
+//
+// Returns:
+// - error - nil if no error, error otherwise
+func (st *store) SetMap(ctx context.Context, key string, value map[string]any) error {
 	jsonValue, jsonError := json.Marshal(value)
+
 	if jsonError != nil {
 		return jsonError
 	}
 
-	return st.Set(ctx, key, string(jsonValue), seconds)
+	return st.Set(ctx, key, string(jsonValue))
 }
 
+// settingSelectQuery builds the select query
+//
+// Parameters:
+// - options: the options for the query
+//
+// Returns:
+// - selectDataset: the select dataset
+// - columns: the columns to select
+// - err: the error
 func (store *store) settingSelectQuery(options SettingQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
 	if options == nil {
 		return nil, []any{}, errors.New("setting query: cannot be nil")
@@ -648,12 +714,20 @@ func (store *store) settingSelectQuery(options SettingQueryInterface) (selectDat
 	return q.Where(softDeleted), columns, nil
 }
 
-func (store *store) logSql(sqlOperationType string, sql string, params ...interface{}) {
+// logSql logs the sql statement to the provided logger
+//
+// # It only logs the sql if debug is enabled, otherwise it does nothing
+//
+// Parameters:
+// - sqlOperationType: the type of sql operation
+// - sqlString: the sql statement
+// - sqlParams: the sql parameters
+func (store *store) logSql(sqlOperationType string, sqlString string, sqlParams ...interface{}) {
 	if !store.debugEnabled {
 		return
 	}
 
 	if store.sqlLogger != nil {
-		store.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sql), slog.Any("params", params))
+		store.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sqlString), slog.Any("params", sqlParams))
 	}
 }
