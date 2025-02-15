@@ -18,10 +18,17 @@ Click any of the buttons below to start a new development environment to demo or
 [![Open in Codeanywhere](https://codeanywhere.com/img/open-in-codeanywhere-btn.svg)](https://app.codeanywhere.com/#https://github.com/gouniverse/settingstore)
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/gouniverse/settingstore)
 
-
 ## Description
 
 Every application needs to preserve settings between multiple restarts. This package helps save the setting represented as key-value pairs in an SQL database.
+
+## License
+
+This project is dual-licensed under the following terms:
+
+- For non-commercial use, you may choose either the GNU Affero General Public License v3.0 (AGPLv3) *or* a separate commercial license (see below). You can find a copy of the AGPLv3 at: https://www.gnu.org/licenses/agpl-3.0.txt
+
+- For commercial use, a separate commercial license is required. Commercial licenses are available for various use cases. Please contact me via my [contact page](https://lesichkov.co.uk/contact) to obtain a commercial license.
 
 ## Features
 
