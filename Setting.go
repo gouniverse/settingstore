@@ -78,7 +78,7 @@ func (setting *Setting) GetCreatedAt() string {
 	return setting.Get(COLUMN_CREATED_AT)
 }
 
-func (setting *Setting) GetCreatedAtCarbon() carbon.Carbon {
+func (setting *Setting) GetCreatedAtCarbon() *carbon.Carbon {
 	return carbon.Parse(setting.GetCreatedAt(), carbon.UTC)
 }
 
@@ -91,7 +91,7 @@ func (setting *Setting) GetUpdatedAt() string {
 	return setting.Get(COLUMN_UPDATED_AT)
 }
 
-func (setting *Setting) GetUpdatedAtCarbon() carbon.Carbon {
+func (setting *Setting) GetUpdatedAtCarbon() *carbon.Carbon {
 	return carbon.Parse(setting.GetUpdatedAt(), carbon.UTC)
 }
 
@@ -104,7 +104,7 @@ func (setting *Setting) GetSoftDeletedAt() string {
 	return setting.Get(COLUMN_SOFT_DELETED_AT)
 }
 
-func (setting *Setting) GetSoftDeletedAtCarbon() carbon.Carbon {
+func (setting *Setting) GetSoftDeletedAtCarbon() *carbon.Carbon {
 	return carbon.Parse(setting.GetSoftDeletedAt(), carbon.UTC)
 }
 

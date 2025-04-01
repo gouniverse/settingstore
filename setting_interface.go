@@ -15,24 +15,24 @@ type SettingInterface interface {
 
 	// Setters and Getters
 
+	GetCreatedAt() string
+	GetCreatedAtCarbon() *carbon.Carbon
+	SetCreatedAt(createdAt string) SettingInterface
+
 	GetID() string
 	SetID(id string) SettingInterface
 
 	GetKey() string
 	SetKey(key string) SettingInterface
 
-	GetValue() string
-	SetValue(value string) SettingInterface
-
-	GetCreatedAt() string
-	GetCreatedAtCarbon() carbon.Carbon
-	SetCreatedAt(createdAt string) SettingInterface
+	GetSoftDeletedAt() string
+	GetSoftDeletedAtCarbon() *carbon.Carbon
+	SetSoftDeletedAt(deletedAt string) SettingInterface
 
 	GetUpdatedAt() string
-	GetUpdatedAtCarbon() carbon.Carbon
+	GetUpdatedAtCarbon() *carbon.Carbon
 	SetUpdatedAt(updatedAt string) SettingInterface
 
-	GetSoftDeletedAt() string
-	GetSoftDeletedAtCarbon() carbon.Carbon
-	SetSoftDeletedAt(deletedAt string) SettingInterface
+	GetValue() string
+	SetValue(value string) SettingInterface
 }
